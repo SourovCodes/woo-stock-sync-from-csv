@@ -179,10 +179,10 @@
             html += '</div>';
 
             // Duration
-            if (log.duration > 0) {
+            if (log.duration && parseFloat(log.duration) > 0) {
                 html += '<div class="wssc-log-detail-row">';
                 html += '<span class="wssc-log-detail-label">Duration</span>';
-                html += '<span class="wssc-log-detail-value">' + log.duration.toFixed(2) + ' seconds</span>';
+                html += '<span class="wssc-log-detail-value">' + parseFloat(log.duration).toFixed(2) + ' seconds</span>';
                 html += '</div>';
             }
 
