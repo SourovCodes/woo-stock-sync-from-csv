@@ -144,7 +144,7 @@ class WSSC_Logs {
                 'stats' => maybe_serialize($data['stats']),
                 'errors' => maybe_serialize($data['errors']),
                 'duration' => floatval($data['duration']),
-                'created_at' => current_time('mysql'),
+                'created_at' => current_time('mysql', true), // Store in UTC
             ],
             ['%s', '%s', '%s', '%s', '%s', '%s', '%f', '%s']
         );
