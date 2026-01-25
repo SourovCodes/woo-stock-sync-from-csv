@@ -27,6 +27,9 @@ class WSSC_Sync {
         'skipped' => 0,
         'errors' => 0,
         'not_found' => 0,
+        'missing_set_zero' => 0,
+        'missing_set_private' => 0,
+        'missing_restored' => 0,
         'start_time' => 0,
         'end_time' => 0,
     ];
@@ -114,6 +117,12 @@ class WSSC_Sync {
         
         foreach ($batches as $batch) {
             $this->process_batch($batch);
+        }
+        
+        // Handle missing SKU action (products in store but not in CSV)
+        $missing_sku_action = get_option('wssc_missing_sku_action', 'ignore');
+        if ($missing_sku_action !== 'ignore') {
+            $this->process_missing_skus($parsed['data'], $missing_sku_action);
         }
         
         // Finalize
@@ -378,7 +387,7 @@ class WSSC_Sync {
              WHERE pm.meta_key = '_sku' 
              AND pm.meta_value IN ($placeholders_str)
              AND p.post_type IN ('product', 'product_variation')
-             AND p.post_status = 'publish'",
+             AND p.post_status IN ('publish', 'private')",
             $skus
         );
         
@@ -408,6 +417,140 @@ class WSSC_Sync {
                     }
                 }
             }
+        }
+        
+        return $products;
+    }
+    
+    /**
+     * Process missing SKUs (products in store but not in CSV)
+     */
+    private function process_missing_skus($csv_data, $action) {
+        global $wpdb;
+        
+        // Get all CSV SKUs
+        $csv_skus = array_keys($csv_data);
+        
+        // Get all store products with stock management enabled
+        $store_products = $this->get_all_store_products_with_sku();
+        
+        // Find products NOT in CSV
+        $missing_skus = array_diff(array_keys($store_products), $csv_skus);
+        
+        if (empty($missing_skus)) {
+            return;
+        }
+        
+        // Get previously privatized products by this plugin
+        $privatized_by_plugin = get_option('wssc_privatized_products', []);
+        
+        // First, restore products that ARE back in CSV
+        if ($action === 'private') {
+            $returned_skus = array_intersect(array_keys($privatized_by_plugin), $csv_skus);
+            foreach ($returned_skus as $sku) {
+                $product_id = $privatized_by_plugin[$sku];
+                $product = wc_get_product($product_id);
+                
+                if ($product && $product->get_status() === 'private') {
+                    // Restore to publish using WordPress function
+                    wp_update_post([
+                        'ID' => $product_id,
+                        'post_status' => 'publish',
+                    ]);
+                    
+                    $this->stats['missing_restored']++;
+                    unset($privatized_by_plugin[$sku]);
+                }
+            }
+            update_option('wssc_privatized_products', $privatized_by_plugin);
+        }
+        
+        // Process missing products
+        foreach ($missing_skus as $sku) {
+            if (!isset($store_products[$sku])) {
+                continue;
+            }
+            
+            $product_id = $store_products[$sku];
+            
+            try {
+                $product = wc_get_product($product_id);
+                
+                if (!$product) {
+                    continue;
+                }
+                
+                // Skip if product doesn't manage stock
+                if (!$product->managing_stock()) {
+                    continue;
+                }
+                
+                if ($action === 'zero') {
+                    // Set stock to 0
+                    $current_stock = $product->get_stock_quantity();
+                    
+                    if ($current_stock !== 0) {
+                        $product->set_stock_quantity(0);
+                        $product->save();
+                        $this->stats['missing_set_zero']++;
+                    }
+                    
+                } elseif ($action === 'private') {
+                    // Set to private if not already
+                    if ($product->get_status() !== 'private') {
+                        // Use WordPress function for status change
+                        wp_update_post([
+                            'ID' => $product_id,
+                            'post_status' => 'private',
+                        ]);
+                        
+                        // Track that we privatized this product
+                        $privatized_by_plugin[$sku] = $product_id;
+                        $this->stats['missing_set_private']++;
+                    }
+                }
+                
+            } catch (Exception $e) {
+                $this->error_messages[] = sprintf(
+                    __('Error handling missing SKU %s: %s', 'woo-stock-sync'),
+                    $sku,
+                    $e->getMessage()
+                );
+            }
+        }
+        
+        // Update tracked privatized products
+        if ($action === 'private') {
+            update_option('wssc_privatized_products', $privatized_by_plugin);
+        }
+    }
+    
+    /**
+     * Get all store products with SKU that manage stock
+     */
+    private function get_all_store_products_with_sku() {
+        global $wpdb;
+        
+        $products = [];
+        
+        // Get all products and variations with SKUs that manage stock
+        $query = "
+            SELECT pm_sku.meta_value as sku, pm_sku.post_id
+            FROM {$wpdb->postmeta} pm_sku
+            INNER JOIN {$wpdb->posts} p ON pm_sku.post_id = p.ID
+            INNER JOIN {$wpdb->postmeta} pm_stock ON pm_sku.post_id = pm_stock.post_id 
+                AND pm_stock.meta_key = '_manage_stock' 
+                AND pm_stock.meta_value = 'yes'
+            WHERE pm_sku.meta_key = '_sku'
+            AND pm_sku.meta_value != ''
+            AND p.post_type IN ('product', 'product_variation')
+            AND p.post_status IN ('publish', 'private')
+        ";
+        
+        $results = $wpdb->get_results($query);
+        
+        foreach ($results as $row) {
+            $products[$row->sku] = intval($row->post_id);
         }
         
         return $products;

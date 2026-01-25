@@ -153,6 +153,24 @@ if (!defined('ABSPATH')) {
                                                     <?php echo esc_html($log->stats['errors']); ?>
                                                 </span>
                                             <?php endif; ?>
+                                            <?php if (isset($log->stats['missing_set_zero']) && $log->stats['missing_set_zero'] > 0): ?>
+                                                <span class="wssc-mini-stat wssc-mini-stat-info" title="<?php esc_attr_e('Set to 0 (missing)', 'woo-stock-sync'); ?>">
+                                                    <span class="dashicons dashicons-editor-strikethrough"></span>
+                                                    <?php echo esc_html($log->stats['missing_set_zero']); ?>
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if (isset($log->stats['missing_set_private']) && $log->stats['missing_set_private'] > 0): ?>
+                                                <span class="wssc-mini-stat wssc-mini-stat-info" title="<?php esc_attr_e('Set to Private (missing)', 'woo-stock-sync'); ?>">
+                                                    <span class="dashicons dashicons-hidden"></span>
+                                                    <?php echo esc_html($log->stats['missing_set_private']); ?>
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if (isset($log->stats['missing_restored']) && $log->stats['missing_restored'] > 0): ?>
+                                                <span class="wssc-mini-stat wssc-mini-stat-success" title="<?php esc_attr_e('Restored (returned)', 'woo-stock-sync'); ?>">
+                                                    <span class="dashicons dashicons-update-alt"></span>
+                                                    <?php echo esc_html($log->stats['missing_restored']); ?>
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                     <?php else: ?>
                                         <span class="wssc-muted">—</span>

@@ -123,6 +123,26 @@ if (!defined('ABSPATH')) {
                         </p>
                     </div>
                 </div>
+                
+                <div class="wssc-form-row">
+                    <label for="wssc-missing-sku-action" class="wssc-label">
+                        <?php esc_html_e('Missing SKU Action', 'woo-stock-sync'); ?>
+                    </label>
+                    <select id="wssc-missing-sku-action" name="missing_sku_action" class="wssc-select" <?php disabled(!$license_valid); ?>>
+                        <option value="ignore" <?php selected($missing_sku_action, 'ignore'); ?>>
+                            <?php esc_html_e('Ignore (keep current stock)', 'woo-stock-sync'); ?>
+                        </option>
+                        <option value="zero" <?php selected($missing_sku_action, 'zero'); ?>>
+                            <?php esc_html_e('Set stock to 0', 'woo-stock-sync'); ?>
+                        </option>
+                        <option value="private" <?php selected($missing_sku_action, 'private'); ?>>
+                            <?php esc_html_e('Set to Private (make public when SKU returns)', 'woo-stock-sync'); ?>
+                        </option>
+                    </select>
+                    <p class="wssc-help-text">
+                        <?php esc_html_e('What to do when a product SKU in your store is not found in the CSV file.', 'woo-stock-sync'); ?>
+                    </p>
+                </div>
             </div>
         </div>
 

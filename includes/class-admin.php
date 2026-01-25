@@ -163,6 +163,12 @@ class WSSC_Admin {
             'type' => 'boolean',
             'default' => false,
         ]);
+        
+        register_setting('wssc_settings', 'wssc_missing_sku_action', [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => 'ignore',
+        ]);
     }
     
     /**
@@ -218,6 +224,7 @@ class WSSC_Admin {
         $qty_column = get_option('wssc_quantity_column', 'quantity');
         $enabled = get_option('wssc_enabled', false);
         $disable_ssl = get_option('wssc_disable_ssl', false);
+        $missing_sku_action = get_option('wssc_missing_sku_action', 'ignore');
         
         include WSSC_PLUGIN_DIR . 'includes/views/settings.php';
     }

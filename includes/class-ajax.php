@@ -145,6 +145,7 @@ class WSSC_Ajax {
         $interval = isset($_POST['schedule_interval']) ? sanitize_text_field($_POST['schedule_interval']) : 'hourly';
         $enabled = isset($_POST['enabled']) && $_POST['enabled'] === 'true';
         $disable_ssl = isset($_POST['disable_ssl']) && $_POST['disable_ssl'] === 'true';
+        $missing_sku_action = isset($_POST['missing_sku_action']) ? sanitize_text_field($_POST['missing_sku_action']) : 'ignore';
         
         // Save settings
         update_option('wssc_csv_url', $csv_url);
@@ -153,6 +154,7 @@ class WSSC_Ajax {
         update_option('wssc_schedule_interval', $interval);
         update_option('wssc_enabled', $enabled);
         update_option('wssc_disable_ssl', $disable_ssl);
+        update_option('wssc_missing_sku_action', $missing_sku_action);
         
         // Handle scheduling
         if ($enabled && !empty($csv_url)) {
