@@ -45,11 +45,28 @@ class WSSC_Updater {
         add_filter('plugins_api', [$this, 'plugin_info'], 20, 3);
         add_filter('upgrader_post_install', [$this, 'after_install'], 10, 3);
         
+        // Enable auto-updates by default
+        add_filter('auto_update_plugin', [$this, 'enable_auto_update'], 10, 2);
+        
         // Schedule periodic update check
         add_action('wssc_update_check', [$this, 'scheduled_check']);
         if (!wp_next_scheduled('wssc_update_check')) {
             wp_schedule_event(time(), 'twicedaily', 'wssc_update_check');
         }
+    }
+    
+    /**
+     * Enable auto-updates for this plugin by default
+     *
+     * @param bool|null $update Whether to update the plugin.
+     * @param object    $item   The plugin update object.
+     * @return bool|null
+     */
+    public function enable_auto_update($update, $item) {
+        if (isset($item->plugin) && $item->plugin === WSSC_PLUGIN_BASENAME) {
+            return true;
+        }
+        return $update;
     }
     
     /**
