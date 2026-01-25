@@ -61,9 +61,12 @@ jobs:
           cp woo-stock-sync-from-csv.php build/woo-stock-sync-from-csv/
           cp readme.txt build/woo-stock-sync-from-csv/ 2>/dev/null || true
           
-          # Create zip
+          # Create versioned zip
           cd build
           zip -r ../woo-stock-sync-from-csv-${{ needs.check-version.outputs.new_version }}.zip woo-stock-sync-from-csv
+          
+          # Create latest zip (static filename)
+          cp ../woo-stock-sync-from-csv-${{ needs.check-version.outputs.new_version }}.zip ../woo-stock-sync-from-csv-latest.zip
           cd ..
 
       - name: Generate changelog
@@ -107,6 +110,7 @@ jobs:
             - PHP 7.4+
           files: |
             woo-stock-sync-from-csv-${{ needs.check-version.outputs.new_version }}.zip
+            woo-stock-sync-from-csv-latest.zip
           draft: false
           prerelease: false
         env:
