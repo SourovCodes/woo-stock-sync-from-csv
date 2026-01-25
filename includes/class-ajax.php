@@ -61,6 +61,22 @@ class WSSC_Ajax {
             ]);
         }
         
+        // Rate limiting: prevent sync within 30 seconds of last manual sync
+        $last_manual = get_transient('wssc_last_manual_sync');
+        if ($last_manual !== false) {
+            $wait_time = 30 - (time() - $last_manual);
+            if ($wait_time > 0) {
+                wp_send_json_error([
+                    'message' => sprintf(
+                        /* translators: %d seconds remaining */
+                        __('Please wait %d seconds before starting another sync.', 'woo-stock-sync'),
+                        $wait_time
+                    ),
+                ]);
+            }
+        }
+        set_transient('wssc_last_manual_sync', time(), 60);
+        
         // Set running status
         WSSC()->scheduler->set_running(true);
         
@@ -87,6 +103,13 @@ class WSSC_Ajax {
     public function test_connection() {
         $this->verify_nonce();
         
+        // Validate license
+        if (!WSSC()->license->is_valid()) {
+            wp_send_json_error([
+                'message' => __('Please activate a valid license first.', 'woo-stock-sync'),
+            ]);
+        }
+        
         $url = isset($_POST['url']) ? esc_url_raw($_POST['url']) : '';
         
         if (empty($url)) {
@@ -109,6 +132,13 @@ class WSSC_Ajax {
      */
     public function preview_csv() {
         $this->verify_nonce();
+        
+        // Validate license
+        if (!WSSC()->license->is_valid()) {
+            wp_send_json_error([
+                'message' => __('Please activate a valid license first.', 'woo-stock-sync'),
+            ]);
+        }
         
         $url = isset($_POST['url']) ? esc_url_raw($_POST['url']) : '';
         
@@ -148,6 +178,12 @@ class WSSC_Ajax {
         $enabled = isset($_POST['enabled']) && $_POST['enabled'] === 'true';
         $disable_ssl = isset($_POST['disable_ssl']) && $_POST['disable_ssl'] === 'true';
         $missing_sku_action = isset($_POST['missing_sku_action']) ? sanitize_text_field($_POST['missing_sku_action']) : 'ignore';
+        
+        // Validate missing_sku_action
+        $valid_actions = ['ignore', 'zero', 'private'];
+        if (!in_array($missing_sku_action, $valid_actions, true)) {
+            $missing_sku_action = 'ignore';
+        }
         
         // Save settings
         update_option('wssc_csv_url', $csv_url);

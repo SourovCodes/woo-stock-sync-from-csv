@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.1.3
+Stable tag: 1.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,19 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.1.4 =
+* Fixed: Stats not resetting between sync runs
+* Fixed: Added license validation to test connection and preview
+* Fixed: WP_Filesystem initialization in auto-updater
+* Fixed: XSS vulnerability in log modal JavaScript
+* Fixed: Replaced deprecated current_time('timestamp')
+* Added: Rate limiting for manual sync (30 second cooldown)
+* Added: Database version handling for future schema upgrades
+* Added: Proper uninstall cleanup (options, transients, cron, table)
+* Added: Input validation for missing_sku_action setting
+* Improved: Centralized domain helper function
+* Improved: Code quality and industry standards compliance
 
 = 1.1.0 =
 * Added automatic updates via 3AG Update API

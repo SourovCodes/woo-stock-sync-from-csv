@@ -9,6 +9,18 @@
     const WSSC = {
 
         /**
+         * Escape HTML to prevent XSS
+         */
+        escapeHtml: function (text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        },
+
+        /**
          * Initialize
          */
         init: function () {
@@ -141,13 +153,14 @@
          * Show log modal
          */
         showLogModal: function (log) {
+            const esc = this.escapeHtml.bind(this);
             let html = '<div class="wssc-log-detail">';
 
             // Status
             html += '<div class="wssc-log-detail-row">';
             html += '<span class="wssc-log-detail-label">Status</span>';
             html += '<span class="wssc-log-detail-value">';
-            html += '<span class="wssc-status-badge wssc-status-' + log.status + '">';
+            html += '<span class="wssc-status-badge wssc-status-' + esc(log.status) + '">';
             if (log.status === 'success') {
                 html += '<span class="dashicons dashicons-yes-alt"></span>';
             } else if (log.status === 'error') {
@@ -155,27 +168,27 @@
             } else {
                 html += '<span class="dashicons dashicons-warning"></span>';
             }
-            html += '</span> ' + log.status.charAt(0).toUpperCase() + log.status.slice(1);
+            html += '</span> ' + esc(log.status.charAt(0).toUpperCase() + log.status.slice(1));
             html += '</span></div>';
 
             // Type
             html += '<div class="wssc-log-detail-row">';
             html += '<span class="wssc-log-detail-label">Type</span>';
-            html += '<span class="wssc-log-detail-value">' + log.type.charAt(0).toUpperCase() + log.type.slice(1) + '</span>';
+            html += '<span class="wssc-log-detail-value">' + esc(log.type.charAt(0).toUpperCase() + log.type.slice(1)) + '</span>';
             html += '</div>';
 
             // Trigger
             if (log.trigger_type) {
                 html += '<div class="wssc-log-detail-row">';
                 html += '<span class="wssc-log-detail-label">Trigger</span>';
-                html += '<span class="wssc-log-detail-value">' + log.trigger_type.charAt(0).toUpperCase() + log.trigger_type.slice(1) + '</span>';
+                html += '<span class="wssc-log-detail-value">' + esc(log.trigger_type.charAt(0).toUpperCase() + log.trigger_type.slice(1)) + '</span>';
                 html += '</div>';
             }
 
             // Message
             html += '<div class="wssc-log-detail-row">';
             html += '<span class="wssc-log-detail-label">Message</span>';
-            html += '<span class="wssc-log-detail-value">' + log.message + '</span>';
+            html += '<span class="wssc-log-detail-value">' + esc(log.message) + '</span>';
             html += '</div>';
 
             // Duration
@@ -226,7 +239,7 @@
                 html += '<div class="wssc-log-errors">';
                 html += '<strong>Errors:</strong><ul>';
                 log.errors.forEach(function (err) {
-                    html += '<li>' + err + '</li>';
+                    html += '<li>' + esc(err) + '</li>';
                 });
                 html += '</ul></div></div></div>';
             }

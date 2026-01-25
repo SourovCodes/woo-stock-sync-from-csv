@@ -126,7 +126,7 @@ class WSSC_Scheduler {
         }
         
         update_option('wssc_schedule_interval', $interval);
-        update_option('wssc_last_scheduled', current_time('timestamp'));
+        update_option('wssc_last_scheduled', time());
         
         return true;
     }
@@ -187,13 +187,13 @@ class WSSC_Scheduler {
             return null;
         }
         
-        $diff = $next - current_time('timestamp');
+        $diff = $next - time();
         
         if ($diff < 0) {
             return __('Overdue', 'woo-stock-sync');
         }
         
-        return human_time_diff(current_time('timestamp'), $next);
+        return human_time_diff(time(), $next);
     }
     
     /**
@@ -245,7 +245,7 @@ class WSSC_Scheduler {
         $interval_seconds = $this->get_interval_seconds($interval);
         $overdue_threshold = $interval_seconds * 2;
         
-        $time_diff = $next_run - current_time('timestamp');
+        $time_diff = $next_run - time();
         
         // If it's been too long since last scheduled run
         if ($time_diff < -$overdue_threshold) {
@@ -261,7 +261,7 @@ class WSSC_Scheduler {
         }
         
         // Log successful watchdog check
-        update_option('wssc_watchdog_last_check', current_time('timestamp'));
+        update_option('wssc_watchdog_last_check', time());
     }
     
     /**
@@ -282,7 +282,7 @@ class WSSC_Scheduler {
             'interval' => $interval,
             'interval_display' => $interval_display,
             'next_run' => $next_run,
-            'next_run_human' => $next_run ? human_time_diff(current_time('timestamp'), $next_run) : null,
+            'next_run_human' => $next_run ? human_time_diff(time(), $next_run) : null,
             'next_run_formatted' => $next_run ? wp_date('Y-m-d H:i:s', $next_run) : null,
             'last_sync' => $last_sync,
             'last_sync_human' => $last_sync ? human_time_diff($last_sync) . ' ' . __('ago', 'woo-stock-sync') : null,

@@ -54,15 +54,7 @@ class WSSC_Updater {
      * Get current domain
      */
     private function get_domain() {
-        $site_url = get_site_url();
-        $domain = wp_parse_url($site_url, PHP_URL_HOST);
-        
-        // Remove www. prefix
-        if (strpos($domain, 'www.') === 0) {
-            $domain = substr($domain, 4);
-        }
-        
-        return strtolower($domain);
+        return wssc_get_domain();
     }
     
     /**
@@ -289,10 +281,24 @@ class WSSC_Updater {
             return $response;
         }
         
+        // Initialize WP_Filesystem if not already
+        if (empty($wp_filesystem)) {
+            require_once ABSPATH . '/wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+        
+        // Verify filesystem is available
+        if (empty($wp_filesystem) || !is_object($wp_filesystem)) {
+            return $response;
+        }
+        
         // Move plugin to correct directory
         $plugin_dir = WP_PLUGIN_DIR . '/' . dirname(WSSC_PLUGIN_BASENAME);
-        $wp_filesystem->move($result['destination'], $plugin_dir);
-        $result['destination'] = $plugin_dir;
+        
+        if ($wp_filesystem->exists($result['destination']) && $result['destination'] !== $plugin_dir) {
+            $wp_filesystem->move($result['destination'], $plugin_dir);
+            $result['destination'] = $plugin_dir;
+        }
         
         // Reactivate plugin
         activate_plugin(WSSC_PLUGIN_BASENAME);

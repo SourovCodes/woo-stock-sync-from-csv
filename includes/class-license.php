@@ -38,15 +38,7 @@ class WSSC_License {
      * Get current domain
      */
     private function get_domain() {
-        $site_url = get_site_url();
-        $domain = wp_parse_url($site_url, PHP_URL_HOST);
-        
-        // Remove www. prefix
-        if (strpos($domain, 'www.') === 0) {
-            $domain = substr($domain, 4);
-        }
-        
-        return strtolower($domain);
+        return wssc_get_domain();
     }
     
     /**
@@ -180,7 +172,7 @@ class WSSC_License {
         ]);
         
         if ($result['success'] && isset($result['data']['activated'])) {
-            update_option('wssc_license_last_check', current_time('timestamp'));
+            update_option('wssc_license_last_check', time());
             
             if ($result['data']['activated']) {
                 update_option('wssc_license_status', 'active');
@@ -259,7 +251,7 @@ class WSSC_License {
         }
         
         $expiry_time = strtotime($expires_at);
-        return $expiry_time < current_time('timestamp');
+        return $expiry_time < time();
     }
     
     /**
@@ -273,7 +265,7 @@ class WSSC_License {
         }
         
         $expiry_time = strtotime($expires_at);
-        $diff = $expiry_time - current_time('timestamp');
+        $diff = $expiry_time - time();
         
         return max(0, floor($diff / DAY_IN_SECONDS));
     }

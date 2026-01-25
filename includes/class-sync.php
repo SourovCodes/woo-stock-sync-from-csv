@@ -64,6 +64,22 @@ class WSSC_Sync {
      * Main sync process
      */
     public function run($trigger = 'manual') {
+        // Reset stats for this run
+        $this->stats = [
+            'total_rows' => 0,
+            'processed' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'not_found' => 0,
+            'missing_set_zero' => 0,
+            'missing_set_private' => 0,
+            'missing_restored' => 0,
+            'start_time' => 0,
+            'end_time' => 0,
+        ];
+        $this->error_messages = [];
+        
         // Check license
         if (!WSSC()->license->is_valid()) {
             $this->log_error(__('Invalid or expired license. Sync aborted.', 'woo-stock-sync'));

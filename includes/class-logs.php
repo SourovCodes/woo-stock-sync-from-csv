@@ -22,21 +22,28 @@ class WSSC_Logs {
     const MAX_LOGS = 100;
     
     /**
+     * Database version for schema upgrades
+     */
+    const DB_VERSION = '1.0.0';
+    
+    /**
      * Constructor
      */
     public function __construct() {
         global $wpdb;
         $this->table_name = $wpdb->prefix . 'wssc_logs';
         
-        // Ensure table exists
-        $this->maybe_create_table();
+        // Ensure table exists and is up to date
+        $this->maybe_create_or_update_table();
     }
     
     /**
-     * Check and create table if needed
+     * Check and create/update table if needed
      */
-    private function maybe_create_table() {
+    private function maybe_create_or_update_table() {
         global $wpdb;
+        
+        $installed_version = get_option('wssc_db_version', '0');
         
         // Check if table exists
         $table_exists = $wpdb->get_var($wpdb->prepare(
@@ -46,7 +53,30 @@ class WSSC_Logs {
         
         if ($table_exists !== $this->table_name) {
             self::create_table();
+            update_option('wssc_db_version', self::DB_VERSION);
+        } elseif (version_compare($installed_version, self::DB_VERSION, '<')) {
+            // Run any schema upgrades here
+            $this->upgrade_table($installed_version);
+            update_option('wssc_db_version', self::DB_VERSION);
         }
+    }
+    
+    /**
+     * Upgrade table schema if needed
+     * 
+     * @param string $from_version Current installed version
+     */
+    private function upgrade_table($from_version) {
+        // Future schema upgrades go here
+        // Example:
+        // if (version_compare($from_version, '1.1.0', '<')) {
+        //     // Add new column
+        //     global $wpdb;
+        //     $wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN new_field VARCHAR(255) DEFAULT NULL");
+        // }
+        
+        // Re-run dbDelta to ensure schema is correct
+        self::create_table();
     }
     
     /**
@@ -126,7 +156,7 @@ class WSSC_Logs {
         
         // Update last sync time if this is a sync log
         if ($data['type'] === 'sync' && $data['status'] === 'success') {
-            update_option('wssc_last_sync_time', current_time('timestamp'));
+            update_option('wssc_last_sync_time', time());
             update_option('wssc_last_sync_stats', $data['stats']);
         }
         
