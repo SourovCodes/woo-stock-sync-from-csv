@@ -431,20 +431,16 @@ class WSSC_Sync {
         // Get all CSV SKUs
         $csv_skus = array_keys($csv_data);
         
-        // Get all store products with stock management enabled
+        // Get all store products with SKUs
         $store_products = $this->get_all_store_products_with_sku();
         
         // Find products NOT in CSV
         $missing_skus = array_diff(array_keys($store_products), $csv_skus);
         
-        if (empty($missing_skus)) {
-            return;
-        }
-        
         // Get previously privatized products by this plugin
         $privatized_by_plugin = get_option('wssc_privatized_products', []);
         
-        // First, restore products that ARE back in CSV
+        // First, restore products that ARE back in CSV (for private action)
         if ($action === 'private') {
             $returned_skus = array_intersect(array_keys($privatized_by_plugin), $csv_skus);
             foreach ($returned_skus as $sku) {
@@ -458,11 +454,19 @@ class WSSC_Sync {
                         'post_status' => 'publish',
                     ]);
                     
+                    // Restore catalog visibility using WooCommerce function
+                    $product->set_catalog_visibility('visible');
+                    $product->save();
+                    
                     $this->stats['missing_restored']++;
                     unset($privatized_by_plugin[$sku]);
                 }
             }
             update_option('wssc_privatized_products', $privatized_by_plugin);
+        }
+        
+        if (empty($missing_skus)) {
+            return;
         }
         
         // Process missing products
@@ -480,12 +484,12 @@ class WSSC_Sync {
                     continue;
                 }
                 
-                // Skip if product doesn't manage stock
-                if (!$product->managing_stock()) {
-                    continue;
-                }
-                
                 if ($action === 'zero') {
+                    // Only apply to products that manage stock
+                    if (!$product->managing_stock()) {
+                        continue;
+                    }
+                    
                     // Set stock to 0
                     $current_stock = $product->get_stock_quantity();
                     
@@ -503,6 +507,10 @@ class WSSC_Sync {
                             'ID' => $product_id,
                             'post_status' => 'private',
                         ]);
+                        
+                        // Set catalog visibility to hidden using WooCommerce function
+                        $product->set_catalog_visibility('hidden');
+                        $product->save();
                         
                         // Track that we privatized this product
                         $privatized_by_plugin[$sku] = $product_id;
@@ -526,21 +534,18 @@ class WSSC_Sync {
     }
     
     /**
-     * Get all store products with SKU that manage stock
+     * Get all store products with SKU
      */
     private function get_all_store_products_with_sku() {
         global $wpdb;
         
         $products = [];
         
-        // Get all products and variations with SKUs that manage stock
+        // Get all products and variations with SKUs (regardless of stock management)
         $query = "
             SELECT pm_sku.meta_value as sku, pm_sku.post_id
             FROM {$wpdb->postmeta} pm_sku
             INNER JOIN {$wpdb->posts} p ON pm_sku.post_id = p.ID
-            INNER JOIN {$wpdb->postmeta} pm_stock ON pm_sku.post_id = pm_stock.post_id 
-                AND pm_stock.meta_key = '_manage_stock' 
-                AND pm_stock.meta_value = 'yes'
             WHERE pm_sku.meta_key = '_sku'
             AND pm_sku.meta_value != ''
             AND p.post_type IN ('product', 'product_variation')
