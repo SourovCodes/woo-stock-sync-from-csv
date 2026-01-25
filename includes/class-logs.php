@@ -115,7 +115,7 @@ class WSSC_Logs {
         global $wpdb;
         
         // Ensure table exists
-        $this->maybe_create_table();
+        $this->maybe_create_or_update_table();
         
         $defaults = [
             'type' => 'sync',
