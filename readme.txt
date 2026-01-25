@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.1.9
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,12 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.2.0 =
+* Fixed: Negative "ago" times (-3585 sec ago) caused by UTC/local timezone mismatch
+* Fixed: Database timestamps now correctly interpreted as UTC
+* Fixed: JavaScript handles negative time differences gracefully
+* Improved: Times under 5 seconds show "just now" instead of "0 sec ago"
 
 = 1.1.9 =
 * Fixed: Incorrect "ago" times (e.g., showing 58 min instead of 2 min)

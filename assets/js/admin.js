@@ -47,6 +47,14 @@
 
                 // Calculate relative time
                 const diffMs = now - date;
+
+                // Handle negative differences (future dates or clock skew)
+                if (diffMs < 0) {
+                    $el.text('just now');
+                    $el.attr('title', date.toLocaleString());
+                    return;
+                }
+
                 const diffSec = Math.floor(diffMs / 1000);
                 const diffMin = Math.floor(diffSec / 60);
                 const diffHour = Math.floor(diffMin / 60);
@@ -54,19 +62,20 @@
 
                 let relativeTime;
                 if (diffSec < 60) {
-                    relativeTime = diffSec + ' sec';
+                    relativeTime = diffSec <= 5 ? 'just now' : diffSec + ' sec ago';
                 } else if (diffMin < 60) {
-                    relativeTime = diffMin + ' min';
+                    relativeTime = diffMin + ' min ago';
                 } else if (diffHour < 24) {
-                    relativeTime = diffHour + ' hour' + (diffHour !== 1 ? 's' : '');
+                    relativeTime = diffHour + ' hour' + (diffHour !== 1 ? 's' : '') + ' ago';
                 } else if (diffDay < 30) {
-                    relativeTime = diffDay + ' day' + (diffDay !== 1 ? 's' : '');
+                    relativeTime = diffDay + ' day' + (diffDay !== 1 ? 's' : '') + ' ago';
                 } else {
-                    relativeTime = Math.floor(diffDay / 30) + ' month' + (Math.floor(diffDay / 30) !== 1 ? 's' : '');
+                    const months = Math.floor(diffDay / 30);
+                    relativeTime = months + ' month' + (months !== 1 ? 's' : '') + ' ago';
                 }
 
                 // Update text
-                $el.text(relativeTime + ' ago');
+                $el.text(relativeTime);
 
                 // Set title to local datetime
                 const localDateTime = date.toLocaleString();
