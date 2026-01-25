@@ -184,8 +184,8 @@ if (!defined('ABSPATH')) {
                                     <?php endif; ?>
                                 </td>
                                 <td class="wssc-col-date">
-                                    <span class="wssc-date" title="<?php echo esc_attr(wp_date('Y-m-d H:i:s', strtotime($log->created_at))); ?>">
-                                        <?php echo esc_html(human_time_diff(strtotime($log->created_at))); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
+                                    <span class="wssc-date wssc-local-time" data-timestamp="<?php echo esc_attr(strtotime($log->created_at)); ?>" title="<?php echo esc_attr(wp_date('Y-m-d H:i:s', strtotime($log->created_at))); ?>">
+                                        <?php echo esc_html(human_time_diff(strtotime($log->created_at), time())); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
                                     </span>
                                 </td>
                                 <td class="wssc-col-actions">

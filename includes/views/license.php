@@ -101,8 +101,8 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                             <?php if ($last_check): ?>
                                 <div class="wssc-license-detail-item">
                                     <span class="wssc-detail-label"><?php esc_html_e('Last Verified', 'woo-stock-sync'); ?></span>
-                                    <span class="wssc-detail-value">
-                                        <?php echo esc_html(human_time_diff($last_check)); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
+                                    <span class="wssc-detail-value wssc-local-time" data-timestamp="<?php echo esc_attr($last_check); ?>">
+                                        <?php echo esc_html(human_time_diff($last_check, time())); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
                                     </span>
                                 </div>
                             <?php endif; ?>
@@ -245,8 +245,8 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                         <?php if (!empty($update_data['checked'])): ?>
                         <div class="wssc-version-row">
                             <span class="wssc-version-label"><?php esc_html_e('Last Checked:', 'woo-stock-sync'); ?></span>
-                            <span class="wssc-version-value wssc-muted">
-                                <?php echo esc_html(human_time_diff($update_data['checked'])); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
+                            <span class="wssc-version-value wssc-muted wssc-local-time" data-timestamp="<?php echo esc_attr($update_data['checked']); ?>">
+                                <?php echo esc_html(human_time_diff($update_data['checked'], time())); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
                             </span>
                         </div>
                         <?php endif; ?>

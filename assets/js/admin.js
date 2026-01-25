@@ -26,6 +26,52 @@
         init: function () {
             this.bindEvents();
             this.initChart();
+            this.initLocalTimes();
+        },
+
+        /**
+         * Convert timestamps to local timezone and relative time
+         */
+        initLocalTimes: function () {
+            $('.wssc-local-time').each(function () {
+                const $el = $(this);
+                const timestamp = parseInt($el.data('timestamp'), 10);
+
+                if (!timestamp || isNaN(timestamp)) {
+                    return;
+                }
+
+                // Convert Unix timestamp to milliseconds
+                const date = new Date(timestamp * 1000);
+                const now = new Date();
+
+                // Calculate relative time
+                const diffMs = now - date;
+                const diffSec = Math.floor(diffMs / 1000);
+                const diffMin = Math.floor(diffSec / 60);
+                const diffHour = Math.floor(diffMin / 60);
+                const diffDay = Math.floor(diffHour / 24);
+
+                let relativeTime;
+                if (diffSec < 60) {
+                    relativeTime = diffSec + ' sec';
+                } else if (diffMin < 60) {
+                    relativeTime = diffMin + ' min';
+                } else if (diffHour < 24) {
+                    relativeTime = diffHour + ' hour' + (diffHour !== 1 ? 's' : '');
+                } else if (diffDay < 30) {
+                    relativeTime = diffDay + ' day' + (diffDay !== 1 ? 's' : '');
+                } else {
+                    relativeTime = Math.floor(diffDay / 30) + ' month' + (Math.floor(diffDay / 30) !== 1 ? 's' : '');
+                }
+
+                // Update text
+                $el.text(relativeTime + ' ago');
+
+                // Set title to local datetime
+                const localDateTime = date.toLocaleString();
+                $el.attr('title', localDateTime);
+            });
         },
 
         /**
@@ -199,10 +245,12 @@
                 html += '</div>';
             }
 
-            // Date
+            // Date - convert to local timezone
             html += '<div class="wssc-log-detail-row">';
             html += '<span class="wssc-log-detail-label">Date</span>';
-            html += '<span class="wssc-log-detail-value">' + log.created_at + '</span>';
+            const logDate = new Date(log.created_at.replace(' ', 'T') + 'Z'); // Parse as UTC
+            const localDateStr = logDate.toLocaleString();
+            html += '<span class="wssc-log-detail-value">' + esc(localDateStr) + '</span>';
             html += '</div>';
 
             // Stats
