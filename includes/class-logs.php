@@ -27,6 +27,26 @@ class WSSC_Logs {
     public function __construct() {
         global $wpdb;
         $this->table_name = $wpdb->prefix . 'wssc_logs';
+        
+        // Ensure table exists
+        $this->maybe_create_table();
+    }
+    
+    /**
+     * Check and create table if needed
+     */
+    private function maybe_create_table() {
+        global $wpdb;
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $this->table_name
+        ));
+        
+        if ($table_exists !== $this->table_name) {
+            self::create_table();
+        }
     }
     
     /**
@@ -64,6 +84,9 @@ class WSSC_Logs {
     public function add($data) {
         global $wpdb;
         
+        // Ensure table exists
+        $this->maybe_create_table();
+        
         $defaults = [
             'type' => 'sync',
             'trigger' => null,
@@ -81,7 +104,7 @@ class WSSC_Logs {
             $data['duration'] = round($data['stats']['end_time'] - $data['stats']['start_time'], 2);
         }
         
-        $wpdb->insert(
+        $result = $wpdb->insert(
             $this->table_name,
             [
                 'type' => sanitize_text_field($data['type']),
@@ -95,6 +118,11 @@ class WSSC_Logs {
             ],
             ['%s', '%s', '%s', '%s', '%s', '%s', '%f', '%s']
         );
+        
+        // Log database errors for debugging
+        if ($result === false) {
+            error_log('WSSC Log Insert Error: ' . $wpdb->last_error);
+        }
         
         // Update last sync time if this is a sync log
         if ($data['type'] === 'sync' && $data['status'] === 'success') {
