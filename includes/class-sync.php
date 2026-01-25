@@ -331,7 +331,7 @@ class WSSC_Sync {
         
         // Check if we should restore private products to public
         $missing_sku_action = get_option('wssc_missing_sku_action', 'ignore');
-        $should_restore_private = ($missing_sku_action === 'set_private');
+        $should_restore_private = ($missing_sku_action === 'private');
         
         // Track products that need to be made public (outside transaction for WC hooks)
         $products_to_publish = [];
@@ -552,8 +552,9 @@ class WSSC_Sync {
                 continue;
             }
             
-            // Use $product->save() to trigger WC hooks (status change is important)
+            // Restore status to publish and catalog visibility to visible (Shop and search results)
             $product->set_status('publish');
+            $product->set_catalog_visibility('visible');
             $product->save();
             
             $this->stats['missing_restored']++;

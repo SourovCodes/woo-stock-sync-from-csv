@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.2.2
+Stable tag: 1.2.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,13 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.2.4 =
+* Fixed: Catalog visibility now set to 'visible' (Shop and search results) when restoring private products to public
+* Note: When making products private, catalog visibility is already set to 'hidden'
+
+= 1.2.3 =
+* Fixed: Bug where option value 'private' was compared against 'set_private' - products now correctly restored to publish
 
 = 1.2.2 =
 * Fixed: Products now correctly restored to 'publish' status when SKU returns to CSV
