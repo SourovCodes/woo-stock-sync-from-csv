@@ -106,19 +106,49 @@ class WSSC_Scheduler {
     
     /**
      * Schedule sync
+     * 
+     * @param string $interval The interval key
+     * @param bool $force Force reschedule even if within current interval
      */
-    public function schedule($interval = null) {
+    public function schedule($interval = null, $force = false) {
         if (!$interval) {
             $interval = get_option('wssc_schedule_interval', 'hourly');
+        }
+        
+        $current_interval = get_option('wssc_schedule_interval', 'hourly');
+        $next_scheduled = wp_next_scheduled('wssc_sync_event');
+        $interval_seconds = $this->get_interval_seconds($interval);
+        
+        // If not forcing, check if we should keep the current schedule
+        if (!$force && $next_scheduled) {
+            $time_until_next = $next_scheduled - time();
+            
+            // If interval hasn't changed and next run is in the future and within the interval, keep it
+            if ($interval === $current_interval && $time_until_next > 0 && $time_until_next <= $interval_seconds) {
+                // Schedule is still valid, don't change it
+                // Just ensure watchdog is scheduled
+                if (!wp_next_scheduled('wssc_watchdog_check')) {
+                    wp_schedule_event(time(), 'wssc_four_hours', 'wssc_watchdog_check');
+                }
+                return true;
+            }
+            
+            // If interval changed but next run is still within the NEW interval, keep it
+            if ($interval !== $current_interval && $time_until_next > 0 && $time_until_next <= $interval_seconds) {
+                // Just update the interval option, don't reschedule
+                update_option('wssc_schedule_interval', $interval);
+                if (!wp_next_scheduled('wssc_watchdog_check')) {
+                    wp_schedule_event(time(), 'wssc_four_hours', 'wssc_watchdog_check');
+                }
+                return true;
+            }
         }
         
         // Clear existing schedule
         $this->unschedule();
         
-        // Schedule new
-        if (!wp_next_scheduled('wssc_sync_event')) {
-            wp_schedule_event(time(), $interval, 'wssc_sync_event');
-        }
+        // Schedule new event
+        wp_schedule_event(time() + $interval_seconds, $interval, 'wssc_sync_event');
         
         // Schedule watchdog if not exists
         if (!wp_next_scheduled('wssc_watchdog_check')) {
@@ -277,17 +307,33 @@ class WSSC_Scheduler {
         $schedules = wp_get_schedules();
         $interval_display = isset($schedules[$interval]) ? $schedules[$interval]['display'] : $interval;
         
+        // Calculate human-readable next run
+        $next_run_human = null;
+        if ($next_run) {
+            $time_diff = $next_run - time();
+            if ($time_diff < 0) {
+                // Overdue - show how long overdue
+                $next_run_human = sprintf(
+                    __('Overdue by %s', 'woo-stock-sync'),
+                    human_time_diff($next_run, time())
+                );
+            } else {
+                $next_run_human = human_time_diff(time(), $next_run);
+            }
+        }
+        
         return [
             'enabled' => $enabled,
             'interval' => $interval,
             'interval_display' => $interval_display,
             'next_run' => $next_run,
-            'next_run_human' => $next_run ? human_time_diff(time(), $next_run) : null,
+            'next_run_human' => $next_run_human,
             'next_run_formatted' => $next_run ? wp_date('Y-m-d H:i:s', $next_run) : null,
+            'next_run_overdue' => $next_run && ($next_run < time()),
             'last_sync' => $last_sync,
-            'last_sync_human' => $last_sync ? human_time_diff($last_sync) . ' ' . __('ago', 'woo-stock-sync') : null,
+            'last_sync_human' => $last_sync ? human_time_diff($last_sync, time()) . ' ' . __('ago', 'woo-stock-sync') : null,
             'watchdog_last' => $watchdog_last,
-            'watchdog_last_human' => $watchdog_last ? human_time_diff($watchdog_last) . ' ' . __('ago', 'woo-stock-sync') : null,
+            'watchdog_last_human' => $watchdog_last ? human_time_diff($watchdog_last, time()) . ' ' . __('ago', 'woo-stock-sync') : null,
         ];
     }
     

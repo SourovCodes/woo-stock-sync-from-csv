@@ -62,7 +62,7 @@ if (!defined('ABSPATH')) {
                         <?php endif; ?>
                     </p>
                     <?php if ($scheduler_status['next_run']): ?>
-                        <p class="wssc-next-run">
+                        <p class="wssc-next-run <?php echo !empty($scheduler_status['next_run_overdue']) ? 'wssc-next-run-overdue' : ''; ?>">
                             <?php 
                             printf(
                                 esc_html__('Next run: %s', 'woo-stock-sync'),

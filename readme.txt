@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.2.4
+Stable tag: 1.2.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,12 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.2.5 =
+* Fixed: Saving settings no longer resets next scheduled run if within current interval
+* Fixed: Next run time now shows "Overdue by X" when scheduled time has passed
+* Improved: Smart scheduling - only reschedules when necessary
+* Added: Visual indicator (red text) for overdue scheduled syncs
 
 = 1.2.4 =
 * Fixed: Catalog visibility now set to 'visible' (Shop and search results) when restoring private products to public
