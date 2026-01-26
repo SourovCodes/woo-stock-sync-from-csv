@@ -307,7 +307,7 @@ If license check fails (API down, network issue), plugin continues working for 7
 
 ```
 wssc_sync_event      - Main sync event
-wssc_watchdog_check  - Watchdog check (every 4 hours)
+wssc_watchdog_check  - Watchdog check (every hour)
 wssc_license_check   - License verification (daily)
 ```
 

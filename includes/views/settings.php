@@ -196,7 +196,7 @@ if (!defined('ABSPATH')) {
                         <span class="dashicons dashicons-shield"></span>
                         <div>
                             <strong><?php esc_html_e('Watchdog Protection', 'woo-stock-sync'); ?></strong>
-                            <p><?php esc_html_e('A watchdog cron runs every 4 hours to ensure the sync schedule is working properly.', 'woo-stock-sync'); ?></p>
+                            <p><?php esc_html_e('A watchdog cron runs every hour to ensure the sync schedule is working properly.', 'woo-stock-sync'); ?></p>
                         </div>
                     </div>
                     <div class="wssc-info-item">
