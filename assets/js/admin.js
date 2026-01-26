@@ -459,19 +459,20 @@
          * Show CSV preview modal
          */
         showPreviewModal: function (data) {
+            const esc = this.escapeHtml.bind(this);
             let html = '<div class="wssc-csv-preview-content">';
-            html += '<p><strong>Columns found:</strong> ' + data.columns.join(', ') + '</p>';
+            html += '<p><strong>Columns found:</strong> ' + esc(data.columns.join(', ')) + '</p>';
             html += '<table class="wssc-preview-table">';
             html += '<thead><tr>';
             data.columns.forEach(function (col) {
-                html += '<th>' + col + '</th>';
+                html += '<th>' + esc(col) + '</th>';
             });
             html += '</tr></thead>';
             html += '<tbody>';
             data.sample.forEach(function (row) {
                 html += '<tr>';
                 row.forEach(function (cell) {
-                    html += '<td>' + cell + '</td>';
+                    html += '<td>' + esc(cell) + '</td>';
                 });
                 html += '</tr>';
             });

@@ -201,7 +201,7 @@ if (!defined('ABSPATH')) {
                                     ?>
                                 </span>
                                 <span class="wssc-activity-time wssc-local-time" data-timestamp="<?php echo esc_attr(strtotime($log->created_at . ' UTC')); ?>">
-                                    <?php echo esc_html(human_time_diff(strtotime($log->created_at . ' UTC'), current_time('timestamp', true))); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
+                                    <?php echo esc_html(human_time_diff(strtotime($log->created_at . ' UTC'), time())); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
                                 </span>
                                 <?php if (!empty($log->stats) && isset($log->stats['updated'])): ?>
                                     <span class="wssc-activity-stats">
