@@ -27,16 +27,25 @@ function wssc_uninstall_cleanup() {
     
     // Delete all plugin options
     $options_to_delete = [
+        // Core settings
         'wssc_csv_url',
         'wssc_sku_column',
         'wssc_quantity_column',
-        'wssc_schedule_frequency',
-        'wssc_schedule_enabled',
-        'wssc_disable_ssl_verify',
+        'wssc_schedule_interval',
+        'wssc_enabled',
+        'wssc_disable_ssl',
         'wssc_missing_sku_action',
+        // License
         'wssc_license_key',
+        'wssc_license_status',
         'wssc_license_data',
-        'wssc_last_sync',
+        'wssc_license_last_check',
+        // Sync tracking
+        'wssc_last_sync_time',
+        'wssc_last_sync_stats',
+        'wssc_last_scheduled',
+        'wssc_privatized_products',
+        // Database
         'wssc_db_version',
     ];
     
@@ -48,7 +57,7 @@ function wssc_uninstall_cleanup() {
     $transients_to_delete = [
         'wssc_update_data',
         'wssc_sync_running',
-        'wssc_license_check',
+        'wssc_last_manual_sync',
     ];
     
     foreach ($transients_to_delete as $transient) {
@@ -57,9 +66,9 @@ function wssc_uninstall_cleanup() {
     
     // Unschedule all cron events
     $cron_hooks = [
-        'wssc_scheduled_sync',
+        'wssc_sync_event',
         'wssc_watchdog_check',
-        'wssc_daily_license_check',
+        'wssc_license_check',
         'wssc_update_check',
     ];
     

@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.2.5
+Stable tag: 1.2.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,14 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.2.6 =
+* Fixed: Uninstall.php now correctly cleans up all plugin options and cron hooks
+* Fixed: Scheduled sync now has lock to prevent concurrent runs
+* Fixed: SQL injection prevention using $wpdb->prepare for table existence checks
+* Fixed: Privatized products tracking now cleans up orphaned entries
+* Improved: Logs table uses composite index for better query performance
+* Security: Enhanced database query safety throughout
 
 = 1.2.5 =
 * Fixed: Saving settings no longer resets next scheduled run if within current interval

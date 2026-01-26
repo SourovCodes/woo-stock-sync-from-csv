@@ -1,6 +1,6 @@
 # WooCommerce Stock Sync from CSV - Plugin Logic Documentation
 
-**Version:** 1.2.4  
+**Version:** 1.2.6  
 **Last Updated:** January 26, 2026
 
 ---
@@ -544,6 +544,8 @@ wp cron event list
 
 | Version | Key Changes |
 |---------|-------------|
+| 1.2.6 | Code review fixes: uninstall cleanup, scheduled sync lock, SQL prepare, orphan cleanup |
+| 1.2.5 | Smart scheduling - settings save no longer resets valid schedules |
 | 1.2.4 | Fixed catalog visibility on restore (visible instead of hidden) |
 | 1.2.3 | Fixed 'private' vs 'set_private' comparison bug |
 | 1.2.2 | Added restore logic for products when SKU returns to CSV |

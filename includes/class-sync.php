@@ -47,10 +47,22 @@ class WSSC_Sync {
     }
     
     /**
-     * Run scheduled sync
+     * Run scheduled sync (with lock to prevent concurrent runs)
      */
     public function run_scheduled_sync() {
-        $this->run('scheduled');
+        // Check if already running
+        if (WSSC()->scheduler->is_running()) {
+            return;
+        }
+        
+        // Set running lock
+        WSSC()->scheduler->set_running(true);
+        
+        try {
+            $this->run('scheduled');
+        } finally {
+            WSSC()->scheduler->set_running(false);
+        }
     }
     
     /**
@@ -452,7 +464,8 @@ class WSSC_Sync {
         
         // Update HPOS lookup table if it exists
         $lookup_table = $wpdb->prefix . 'wc_product_meta_lookup';
-        if ($wpdb->get_var("SHOW TABLES LIKE '$lookup_table'") === $lookup_table) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $lookup_table)) === $lookup_table) {
             $wpdb->update(
                 $lookup_table,
                 [
@@ -598,7 +611,8 @@ class WSSC_Sync {
         if (class_exists('Automattic\WooCommerce\Utilities\OrderUtil')) {
             // HPOS compatible lookup for product variations
             $wc_product_meta_lookup = $wpdb->prefix . 'wc_product_meta_lookup';
-            if ($wpdb->get_var("SHOW TABLES LIKE '$wc_product_meta_lookup'") === $wc_product_meta_lookup) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wc_product_meta_lookup)) === $wc_product_meta_lookup) {
                 $query = $wpdb->prepare(
                     "SELECT sku, product_id 
                      FROM {$wc_product_meta_lookup} 
@@ -637,6 +651,9 @@ class WSSC_Sync {
         
         // Get previously privatized products by this plugin
         $privatized_by_plugin = get_option('wssc_privatized_products', []);
+        
+        // Clean up orphaned entries (products that no longer exist)
+        $privatized_by_plugin = $this->cleanup_privatized_products($privatized_by_plugin);
         
         // First, restore products that ARE back in CSV (for private action)
         if ($action === 'private') {
@@ -890,5 +907,36 @@ class WSSC_Sync {
             'sample' => $sample_rows,
             'delimiter' => $delimiter === "\t" ? 'tab' : $delimiter,
         ];
+    }
+    
+    /**
+     * Clean up orphaned entries from privatized products tracking
+     * Removes entries for products that no longer exist or have been manually restored
+     *
+     * @param array $privatized_by_plugin Current tracking array
+     * @return array Cleaned tracking array
+     */
+    private function cleanup_privatized_products($privatized_by_plugin) {
+        if (empty($privatized_by_plugin)) {
+            return [];
+        }
+        
+        $cleaned = [];
+        
+        foreach ($privatized_by_plugin as $sku => $product_id) {
+            $product = wc_get_product($product_id);
+            
+            // Keep only if product exists and is still private
+            if ($product && $product->get_status() === 'private') {
+                $cleaned[$sku] = $product_id;
+            }
+        }
+        
+        // Only update option if something changed
+        if (count($cleaned) !== count($privatized_by_plugin)) {
+            update_option('wssc_privatized_products', $cleaned);
+        }
+        
+        return $cleaned;
     }
 }

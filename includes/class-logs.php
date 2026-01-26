@@ -99,8 +99,7 @@ class WSSC_Logs {
             duration float DEFAULT 0,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY type (type),
-            KEY status (status),
+            KEY type_status (type, status),
             KEY created_at (created_at)
         ) {$charset_collate};";
         
