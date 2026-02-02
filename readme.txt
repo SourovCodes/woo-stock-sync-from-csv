@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 8.0
-Stable tag: 1.3.2
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,7 +63,17 @@ Yes, the plugin supports both simple products and product variations. Each varia
 You can configure this in Settings. Options include: ignore (keep current stock), set stock to 0, or make the product private (and restore when it returns).
 
 == Changelog ==
-
+= 1.4.0 =
+* Major: Industry-standard license management system
+* New: Four distinct license states - Active, Expired, Invalid, Inactive
+* New: 7-day grace period for network errors (prevents temporary outages from disabling sync)
+* New: Dedicated renewal URL with pre-filled license key for expired licenses
+* New: Specific UI and messaging for each license state
+* New: Grace period notification shown when network issues detected
+* Improved: License key never auto-deleted, only cleared on explicit user action
+* Improved: Status-specific admin notices with appropriate severity
+* Improved: More intuitive license page with clear actions per state
+* Changed: Plugin updates always available regardless of license status
 = 1.1.3 =
 * Fixed: JavaScript error when viewing log details (duration.toFixed)
 
@@ -76,6 +86,12 @@ You can configure this in Settings. Options include: ignore (keep current stock)
 * Added manual "Check for Updates" button in License page
 * Added one-click "Update" button when new version available
 * Improved update UI with version info display
+
+= 1.3.3 =
+* Improved: License key is preserved when license becomes inactive (expired, suspended, etc.)
+* Improved: New "License Inactive" UI state with Verify button to auto-reactivate when server status is restored
+* Added: Option to use a different license key when current one is inactive
+* Changed: License status auto-restores on next verification if server-side license is valid again
 
 = 1.3.2 =
 * Fixed: Network errors no longer invalidate license (only 401/403 API errors do)

@@ -104,6 +104,7 @@
             $('#wssc-license-form').on('submit', this.activateLicense.bind(this));
             $('#wssc-deactivate-license').on('click', this.deactivateLicense.bind(this));
             $('#wssc-check-license').on('click', this.checkLicense.bind(this));
+            $('#wssc-use-different-license').on('click', this.showDifferentLicenseForm.bind(this));
 
             // Updates
             $('#wssc-check-update').on('click', this.checkUpdate.bind(this));
@@ -562,8 +563,11 @@
                 .done(function (response) {
                     if (response.success) {
                         if (response.data.activated) {
-                            WSSC.toast('License is valid and active', 'success');
-                            $btn.prop('disabled', false);
+                            WSSC.toast('License is valid and active. Reloading...', 'success');
+                            // Always reload to update UI state (especially for inactive -> active transition)
+                            setTimeout(function () {
+                                location.reload();
+                            }, 1000);
                         } else {
                             WSSC.toast('License is not active for this domain. Reloading...', 'error');
                             // Reload page to update UI state
@@ -583,6 +587,18 @@
                     WSSC.toast('Failed to check license', 'error');
                     $btn.prop('disabled', false);
                 });
+        },
+
+        /**
+         * Show different license form (for inactive/expired/invalid license state)
+         */
+        showDifferentLicenseForm: function (e) {
+            e.preventDefault();
+
+            // Hide the current license info and actions, show the activation form
+            $('.wssc-license-key-display, .wssc-inactive-notice, .wssc-expired-notice, .wssc-invalid-notice, .wssc-license-actions, .wssc-different-license').hide();
+            $('#wssc-license-form').slideDown();
+            $('#wssc-license-key').focus();
         },
 
         /**

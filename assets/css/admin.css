@@ -1131,6 +1131,14 @@
     border-color: var(--wssc-success);
 }
 
+.wssc-license-card.wssc-license-expired {
+    border-color: var(--wssc-warning);
+}
+
+.wssc-license-card.wssc-license-invalid {
+    border-color: var(--wssc-danger);
+}
+
 .wssc-license-status-display {
     display: flex;
     align-items: center;
@@ -1158,9 +1166,19 @@
     color: var(--wssc-success);
 }
 
+.wssc-license-expired .wssc-license-icon {
+    background: var(--wssc-warning-light);
+    color: var(--wssc-warning);
+}
+
+.wssc-license-invalid .wssc-license-icon {
+    background: var(--wssc-danger-light);
+    color: var(--wssc-danger);
+}
+
 .wssc-license-inactive .wssc-license-icon {
-    background: var(--wssc-gray-100);
-    color: var(--wssc-gray-400);
+    background: var(--wssc-warning-light);
+    color: var(--wssc-warning);
 }
 
 .wssc-license-info h2 {
@@ -1253,6 +1271,76 @@
 .wssc-license-actions {
     display: flex;
     gap: 12px;
+}
+
+.wssc-inactive-notice {
+    background: var(--wssc-warning-light);
+    color: var(--wssc-gray-700);
+    padding: 12px 16px;
+    border-radius: var(--wssc-radius);
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.wssc-expired-notice {
+    background: var(--wssc-warning-light);
+    color: var(--wssc-gray-700);
+    padding: 12px 16px;
+    border-radius: var(--wssc-radius);
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.wssc-grace-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--wssc-warning-light);
+    border-radius: var(--wssc-radius);
+    font-size: 13px;
+    color: var(--wssc-gray-700);
+}
+
+.wssc-grace-notice .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--wssc-warning);
+}
+
+.wssc-invalid-key .wssc-license-key-masked {
+    background: var(--wssc-danger-light);
+    color: var(--wssc-danger);
+}
+
+.wssc-invalid-notice {
+    background: var(--wssc-danger-light);
+    color: var(--wssc-gray-700);
+    padding: 12px 16px;
+    border-radius: var(--wssc-radius);
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.wssc-different-license {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--wssc-gray-100);
+}
+
+.wssc-different-license a {
+    color: var(--wssc-primary);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.wssc-different-license a:hover {
+    text-decoration: underline;
 }
 
 .wssc-license-help {

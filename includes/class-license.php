@@ -4,6 +4,16 @@
  * 
  * Handles license validation, activation, deactivation, and status checks
  * using the 3AG License API.
+ * 
+ * License Status Values:
+ * - 'active'   : License is valid and activated for this domain
+ * - 'expired'  : License has expired (was valid before)
+ * - 'invalid'  : License key doesn't exist or wrong product (401)
+ * - 'inactive' : License is suspended/cancelled or domain not activated (403)
+ * - ''         : No license entered yet
+ * 
+ * Grace Period:
+ * - 7 days for network errors to prevent temporary outages from breaking sites
  */
 
 if (!defined('ABSPATH')) {
@@ -21,6 +31,19 @@ class WSSC_License {
      * Product slug for API
      */
     const PRODUCT_SLUG = 'woo-stock-sync-from-csv';
+    
+    /**
+     * Grace period in days for network errors
+     */
+    const GRACE_PERIOD_DAYS = 7;
+    
+    /**
+     * Valid license statuses
+     */
+    const STATUS_ACTIVE = 'active';
+    const STATUS_EXPIRED = 'expired';
+    const STATUS_INVALID = 'invalid';
+    const STATUS_INACTIVE = 'inactive';
     
     /**
      * Constructor
@@ -99,30 +122,22 @@ class WSSC_License {
     }
     
     /**
-     * Validate license key
+     * Validate license key (without activating)
      */
     public function validate($license_key) {
-        $result = $this->api_request('/licenses/validate', [
+        return $this->api_request('/licenses/validate', [
             'license_key' => $license_key,
             'product_slug' => self::PRODUCT_SLUG,
         ]);
-        
-        return $result;
     }
     
     /**
      * Activate license for this domain
      * 
-     * Clears any existing license data before attempting activation
-     * to ensure clean state regardless of outcome.
+     * @param string $license_key The license key to activate
+     * @return array Result with success status and message
      */
     public function activate($license_key) {
-        // Clear existing license data first to avoid stale state
-        delete_option('wssc_license_key');
-        delete_option('wssc_license_status');
-        delete_option('wssc_license_data');
-        delete_option('wssc_license_last_check');
-        
         $result = $this->api_request('/licenses/activate', [
             'license_key' => $license_key,
             'product_slug' => self::PRODUCT_SLUG,
@@ -130,12 +145,37 @@ class WSSC_License {
         ]);
         
         if ($result['success']) {
+            // Success - store all license data
             update_option('wssc_license_key', $license_key);
-            update_option('wssc_license_status', 'active');
+            update_option('wssc_license_status', self::STATUS_ACTIVE);
             update_option('wssc_license_data', $result['data']);
             update_option('wssc_license_last_check', time());
+            delete_option('wssc_license_grace_start'); // Clear any grace period
+            
+            return $result;
         }
-        // On failure, all license data is cleared - user can try again
+        
+        // Handle specific error codes
+        $http_code = isset($result['http_code']) ? $result['http_code'] : 0;
+        
+        if ($http_code === 401) {
+            // Invalid license key
+            update_option('wssc_license_key', $license_key); // Keep key for reference
+            update_option('wssc_license_status', self::STATUS_INVALID);
+            delete_option('wssc_license_data');
+        } elseif ($http_code === 403) {
+            // License suspended, cancelled, expired, or domain limit reached
+            update_option('wssc_license_key', $license_key);
+            
+            // Check if it's an expiry issue based on message
+            if (strpos(strtolower($result['message']), 'expired') !== false) {
+                update_option('wssc_license_status', self::STATUS_EXPIRED);
+            } else {
+                update_option('wssc_license_status', self::STATUS_INACTIVE);
+            }
+            delete_option('wssc_license_data');
+        }
+        // For network errors during activation, don't save anything - let user retry
         
         return $result;
     }
@@ -143,46 +183,46 @@ class WSSC_License {
     /**
      * Deactivate license for this domain
      * 
-     * Always clears local license data, regardless of API response.
-     * This ensures users can enter a new license even if the old one
-     * was deleted from the server or the API is unreachable.
+     * Clears local license data to allow entering a new license.
+     * 
+     * @param string|null $license_key Optional license key
+     * @return array Result
      */
     public function deactivate($license_key = null) {
         if (!$license_key) {
             $license_key = get_option('wssc_license_key');
         }
         
-        // Always clear local license data first
+        // Attempt to deactivate on server first (to free up activation slot)
+        if ($license_key) {
+            $this->api_request('/licenses/deactivate', [
+                'license_key' => $license_key,
+                'product_slug' => self::PRODUCT_SLUG,
+                'domain' => $this->get_domain(),
+            ]);
+        }
+        
+        // Always clear local license data
         delete_option('wssc_license_key');
         delete_option('wssc_license_status');
         delete_option('wssc_license_data');
         delete_option('wssc_license_last_check');
+        delete_option('wssc_license_grace_start');
         
-        if (!$license_key) {
-            return [
-                'success' => true,
-                'message' => __('License cleared.', 'woo-stock-sync'),
-            ];
-        }
-        
-        // Attempt to deactivate on server (to free up activation slot)
-        // Result doesn't affect local deactivation - it's already done
-        $result = $this->api_request('/licenses/deactivate', [
-            'license_key' => $license_key,
-            'product_slug' => self::PRODUCT_SLUG,
-            'domain' => $this->get_domain(),
-        ]);
-        
-        // Always return success since local data is cleared
         return [
             'success' => true,
             'message' => __('License deactivated.', 'woo-stock-sync'),
-            'api_success' => $result['success'],
         ];
     }
     
     /**
-     * Check license status
+     * Check license status with server
+     * 
+     * Updates local status based on server response.
+     * Implements grace period for network errors.
+     * 
+     * @param string|null $license_key Optional license key
+     * @return array Result
      */
     public function check($license_key = null) {
         if (!$license_key) {
@@ -205,34 +245,103 @@ class WSSC_License {
         
         update_option('wssc_license_last_check', time());
         
+        // Handle successful API response
         if ($result['success'] && isset($result['data']['activated'])) {
+            delete_option('wssc_license_grace_start'); // Clear grace period
+            
             if ($result['data']['activated']) {
-                update_option('wssc_license_status', 'active');
+                // License is valid and activated
+                update_option('wssc_license_status', self::STATUS_ACTIVE);
                 if (isset($result['data']['license'])) {
                     update_option('wssc_license_data', $result['data']['license']);
+                    
+                    // Check if expired based on license data
+                    $expires_at = isset($result['data']['license']['expires_at']) 
+                        ? $result['data']['license']['expires_at'] 
+                        : null;
+                    
+                    if ($expires_at && strtotime($expires_at) < time()) {
+                        update_option('wssc_license_status', self::STATUS_EXPIRED);
+                    }
                 }
             } else {
-                // License exists but not activated for this domain
-                update_option('wssc_license_status', 'inactive');
+                // License exists but not activated for this domain (or suspended)
+                update_option('wssc_license_status', self::STATUS_INACTIVE);
             }
-        } elseif (!$result['success']) {
-            // Check if this is a network error or a definitive API error
-            $is_network_error = !empty($result['is_network_error']);
-            $http_code = isset($result['http_code']) ? $result['http_code'] : 0;
             
-            // Only mark as inactive for definitive API errors (401, 403)
-            // Don't invalidate on network errors (temporary issues)
-            if (!$is_network_error && in_array($http_code, [401, 403], true)) {
-                update_option('wssc_license_status', 'inactive');
+            return $result;
+        }
+        
+        // Handle API errors
+        $is_network_error = !empty($result['is_network_error']);
+        $http_code = isset($result['http_code']) ? $result['http_code'] : 0;
+        
+        if ($is_network_error) {
+            // Network error - apply grace period
+            return $this->handle_network_error($result);
+        }
+        
+        // Definitive API errors
+        if ($http_code === 401) {
+            // License key doesn't exist
+            update_option('wssc_license_status', self::STATUS_INVALID);
+        } elseif ($http_code === 403) {
+            // License suspended, cancelled, or expired
+            if (strpos(strtolower($result['message']), 'expired') !== false) {
+                update_option('wssc_license_status', self::STATUS_EXPIRED);
+            } else {
+                update_option('wssc_license_status', self::STATUS_INACTIVE);
             }
-            // For network errors, keep current status unchanged
         }
         
         return $result;
     }
     
     /**
-     * Daily license verification
+     * Handle network error with grace period
+     * 
+     * @param array $result The failed result
+     * @return array Modified result
+     */
+    private function handle_network_error($result) {
+        $grace_start = get_option('wssc_license_grace_start');
+        $current_status = get_option('wssc_license_status');
+        
+        // Only apply grace period if license was previously active
+        if ($current_status !== self::STATUS_ACTIVE) {
+            return $result;
+        }
+        
+        if (!$grace_start) {
+            // Start grace period
+            update_option('wssc_license_grace_start', time());
+            $result['message'] = __('Network error. License will remain active for 7 days.', 'woo-stock-sync');
+        } else {
+            // Check if grace period expired
+            $grace_end = $grace_start + (self::GRACE_PERIOD_DAYS * DAY_IN_SECONDS);
+            
+            if (time() > $grace_end) {
+                // Grace period expired - mark as inactive
+                update_option('wssc_license_status', self::STATUS_INACTIVE);
+                delete_option('wssc_license_grace_start');
+                $result['message'] = __('License verification failed. Grace period expired.', 'woo-stock-sync');
+            } else {
+                // Still in grace period
+                $days_left = ceil(($grace_end - time()) / DAY_IN_SECONDS);
+                $result['message'] = sprintf(
+                    __('Network error. License active for %d more days.', 'woo-stock-sync'),
+                    $days_left
+                );
+                // Keep status as active during grace period
+                $result['in_grace_period'] = true;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Daily license verification (cron job)
      */
     public function daily_check() {
         $license_key = get_option('wssc_license_key');
@@ -243,42 +352,101 @@ class WSSC_License {
         // check() updates wssc_license_status internally
         $this->check($license_key);
         
-        // Now check if license is valid after the API check
+        // If license is no longer valid, disable sync
         if (!$this->is_valid()) {
-            // License is no longer valid, disable sync
             update_option('wssc_enabled', false);
-            
-            // Clear scheduled sync
             wp_clear_scheduled_hook('wssc_sync_event');
             
-            // Log the event
             WSSC()->logs->add([
                 'type' => 'license',
                 'status' => 'error',
-                'message' => __('License validation failed. Sync has been disabled.', 'woo-stock-sync'),
+                'message' => sprintf(
+                    __('License status: %s. Sync has been disabled.', 'woo-stock-sync'),
+                    $this->get_status_label()
+                ),
             ]);
         }
     }
     
     /**
-     * Check if license is valid
+     * Check if license is valid for sync operations
+     * 
+     * @return bool True if license allows sync
      */
     public function is_valid() {
         $status = get_option('wssc_license_status');
         $license_key = get_option('wssc_license_key');
         
-        return $license_key && $status === 'active';
+        return $license_key && $status === self::STATUS_ACTIVE;
+    }
+    
+    /**
+     * Get current license status
+     * 
+     * @return string Status constant or empty string
+     */
+    public function get_status() {
+        return get_option('wssc_license_status', '');
+    }
+    
+    /**
+     * Get human-readable status label
+     * 
+     * @return string Translated status label
+     */
+    public function get_status_label() {
+        $status = $this->get_status();
+        
+        $labels = [
+            self::STATUS_ACTIVE => __('Active', 'woo-stock-sync'),
+            self::STATUS_EXPIRED => __('Expired', 'woo-stock-sync'),
+            self::STATUS_INVALID => __('Invalid', 'woo-stock-sync'),
+            self::STATUS_INACTIVE => __('Inactive', 'woo-stock-sync'),
+        ];
+        
+        return isset($labels[$status]) ? $labels[$status] : __('Not Activated', 'woo-stock-sync');
+    }
+    
+    /**
+     * Get license key
+     * 
+     * @return string License key or empty string
+     */
+    public function get_key() {
+        return get_option('wssc_license_key', '');
+    }
+    
+    /**
+     * Get masked license key for display
+     * 
+     * @return string Masked key like "XXXX-••••-••••-XXXX"
+     */
+    public function get_masked_key() {
+        $key = $this->get_key();
+        $key_length = strlen($key);
+        
+        if ($key_length > 8) {
+            return substr($key, 0, 4) . str_repeat('•', $key_length - 8) . substr($key, -4);
+        } elseif ($key_length > 4) {
+            return substr($key, 0, 2) . str_repeat('•', $key_length - 2);
+        }
+        
+        return str_repeat('•', $key_length);
     }
     
     /**
      * Get license data
+     * 
+     * @return array License data
      */
     public function get_data() {
         return get_option('wssc_license_data', []);
     }
     
     /**
-     * Get license expiry
+     * Get license expiry date
+     * 
+     * @return string|null ISO date string or null for lifetime
      */
     public function get_expiry() {
         $data = $this->get_data();
@@ -287,21 +455,23 @@ class WSSC_License {
     
     /**
      * Check if license is expired
+     * 
+     * @return bool True if expired
      */
     public function is_expired() {
         $expires_at = $this->get_expiry();
         
         if (!$expires_at) {
-            // Lifetime license
-            return false;
+            return false; // Lifetime license
         }
         
-        $expiry_time = strtotime($expires_at);
-        return $expiry_time < time();
+        return strtotime($expires_at) < time();
     }
     
     /**
-     * Get remaining days
+     * Get remaining days until expiry
+     * 
+     * @return int|null Days remaining, 0 if expired, null for lifetime
      */
     public function get_remaining_days() {
         $expires_at = $this->get_expiry();
@@ -310,17 +480,76 @@ class WSSC_License {
             return null; // Lifetime
         }
         
-        $expiry_time = strtotime($expires_at);
-        $diff = $expiry_time - time();
-        
+        $diff = strtotime($expires_at) - time();
         return max(0, floor($diff / DAY_IN_SECONDS));
     }
     
     /**
      * Get activations info
+     * 
+     * @return array With 'limit' and 'used' keys
      */
     public function get_activations() {
         $data = $this->get_data();
         return isset($data['activations']) ? $data['activations'] : ['limit' => 0, 'used' => 0];
+    }
+    
+    /**
+     * Get last check timestamp
+     * 
+     * @return int|null Unix timestamp or null
+     */
+    public function get_last_check() {
+        return get_option('wssc_license_last_check');
+    }
+    
+    /**
+     * Check if currently in grace period
+     * 
+     * @return bool True if in grace period
+     */
+    public function is_in_grace_period() {
+        $grace_start = get_option('wssc_license_grace_start');
+        
+        if (!$grace_start) {
+            return false;
+        }
+        
+        $grace_end = $grace_start + (self::GRACE_PERIOD_DAYS * DAY_IN_SECONDS);
+        return time() <= $grace_end;
+    }
+    
+    /**
+     * Get grace period days remaining
+     * 
+     * @return int|null Days remaining or null if not in grace period
+     */
+    public function get_grace_days_remaining() {
+        $grace_start = get_option('wssc_license_grace_start');
+        
+        if (!$grace_start) {
+            return null;
+        }
+        
+        $grace_end = $grace_start + (self::GRACE_PERIOD_DAYS * DAY_IN_SECONDS);
+        $remaining = $grace_end - time();
+        
+        return max(0, ceil($remaining / DAY_IN_SECONDS));
+    }
+    
+    /**
+     * Get renewal URL
+     * 
+     * @return string URL to renewal page
+     */
+    public function get_renewal_url() {
+        $base_url = 'https://3ag.app/products/woo-stock-sync-from-csv';
+        $license_key = $this->get_key();
+        
+        if ($license_key) {
+            return add_query_arg('renew', urlencode($license_key), $base_url);
+        }
+        
+        return $base_url;
     }
 }

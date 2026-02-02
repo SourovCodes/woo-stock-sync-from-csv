@@ -1,17 +1,52 @@
 <?php
 /**
  * License View
+ * 
+ * Displays different UI based on license status:
+ * - active:   Green card with license details and verify/deactivate buttons
+ * - expired:  Yellow card with renewal link and verify button
+ * - invalid:  Red card with enter new key form
+ * - inactive: Yellow card with verify button and enter new key option
+ * - (none):   Standard activation form
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-$is_active = $license_status === 'active';
+// Get license info from class methods
+$license = WSSC()->license;
+$status = $license->get_status();
+$license_key = $license->get_key();
+$masked_key = $license->get_masked_key();
+$license_data = $license->get_data();
+$last_check = $license->get_last_check();
+$renewal_url = $license->get_renewal_url();
+
+$is_active = ($status === WSSC_License::STATUS_ACTIVE);
+$is_expired = ($status === WSSC_License::STATUS_EXPIRED);
+$is_invalid = ($status === WSSC_License::STATUS_INVALID);
+$is_inactive = ($status === WSSC_License::STATUS_INACTIVE);
+$has_license = !empty($license_key);
+
+// Get license details
 $expires_at = isset($license_data['expires_at']) ? $license_data['expires_at'] : null;
 $activations = isset($license_data['activations']) ? $license_data['activations'] : null;
 $product_name = isset($license_data['product']) ? $license_data['product'] : '';
 $package = isset($license_data['package']) ? $license_data['package'] : '';
+$remaining_days = $license->get_remaining_days();
+$in_grace_period = $license->is_in_grace_period();
+$grace_days = $license->get_grace_days_remaining();
+
+// Determine card class
+$card_class = 'wssc-license-inactive';
+if ($is_active) {
+    $card_class = 'wssc-license-active';
+} elseif ($is_expired) {
+    $card_class = 'wssc-license-expired';
+} elseif ($is_invalid) {
+    $card_class = 'wssc-license-invalid';
+}
 ?>
 
 <div class="wssc-wrap">
@@ -24,24 +59,39 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
 
     <div class="wssc-license-container">
         <!-- License Status Card -->
-        <div class="wssc-section wssc-card wssc-license-card <?php echo $is_active ? 'wssc-license-active' : 'wssc-license-inactive'; ?>">
+        <div class="wssc-section wssc-card wssc-license-card <?php echo esc_attr($card_class); ?>">
             <div class="wssc-card-body">
                 <div class="wssc-license-status-display">
                     <div class="wssc-license-icon">
                         <?php if ($is_active): ?>
                             <span class="dashicons dashicons-yes-alt"></span>
+                        <?php elseif ($is_expired): ?>
+                            <span class="dashicons dashicons-clock"></span>
+                        <?php elseif ($is_invalid): ?>
+                            <span class="dashicons dashicons-dismiss"></span>
+                        <?php elseif ($is_inactive): ?>
+                            <span class="dashicons dashicons-warning"></span>
                         <?php else: ?>
                             <span class="dashicons dashicons-lock"></span>
                         <?php endif; ?>
                     </div>
                     <div class="wssc-license-info">
                         <h2>
-                            <?php if ($is_active): ?>
-                                <?php esc_html_e('License Active', 'woo-stock-sync'); ?>
-                            <?php else: ?>
-                                <?php esc_html_e('License Not Active', 'woo-stock-sync'); ?>
-                            <?php endif; ?>
+                            <?php 
+                            if ($is_active) {
+                                esc_html_e('License Active', 'woo-stock-sync');
+                            } elseif ($is_expired) {
+                                esc_html_e('License Expired', 'woo-stock-sync');
+                            } elseif ($is_invalid) {
+                                esc_html_e('License Invalid', 'woo-stock-sync');
+                            } elseif ($is_inactive) {
+                                esc_html_e('License Inactive', 'woo-stock-sync');
+                            } else {
+                                esc_html_e('No License', 'woo-stock-sync');
+                            }
+                            ?>
                         </h2>
+                        
                         <?php if ($is_active && $product_name): ?>
                             <p class="wssc-license-product">
                                 <?php echo esc_html($product_name); ?>
@@ -49,8 +99,24 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                                     <span class="wssc-license-package"><?php echo esc_html($package); ?></span>
                                 <?php endif; ?>
                             </p>
-                        <?php elseif (!$is_active): ?>
-                            <p><?php esc_html_e('Enter your license key to activate premium features.', 'woo-stock-sync'); ?></p>
+                        <?php elseif ($is_expired): ?>
+                            <p><?php esc_html_e('Your license has expired. Renew to continue using sync features.', 'woo-stock-sync'); ?></p>
+                        <?php elseif ($is_invalid): ?>
+                            <p><?php esc_html_e('This license key is not valid. Please check your key or enter a new one.', 'woo-stock-sync'); ?></p>
+                        <?php elseif ($is_inactive): ?>
+                            <p><?php esc_html_e('Your license is suspended or not activated for this domain. Click "Verify License" to check the current status.', 'woo-stock-sync'); ?></p>
+                        <?php else: ?>
+                            <p><?php esc_html_e('Enter your license key to activate sync features.', 'woo-stock-sync'); ?></p>
+                        <?php endif; ?>
+                        
+                        <?php if ($in_grace_period && $grace_days): ?>
+                            <p class="wssc-grace-notice">
+                                <span class="dashicons dashicons-info"></span>
+                                <?php printf(
+                                    esc_html__('Network issue detected. License will remain active for %d more days.', 'woo-stock-sync'),
+                                    $grace_days
+                                ); ?>
+                            </p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -65,11 +131,10 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                                     <?php if ($expires_at): ?>
                                         <?php 
                                         $expiry_date = strtotime($expires_at);
-                                        $remaining = WSSC()->license->get_remaining_days();
                                         echo esc_html(wp_date('F j, Y', $expiry_date));
-                                        if ($remaining !== null) {
-                                            if ($remaining > 0) {
-                                                echo ' <span class="wssc-days-remaining">(' . sprintf(esc_html__('%d days left', 'woo-stock-sync'), $remaining) . ')</span>';
+                                        if ($remaining_days !== null) {
+                                            if ($remaining_days > 0) {
+                                                echo ' <span class="wssc-days-remaining">(' . sprintf(esc_html__('%d days left', 'woo-stock-sync'), $remaining_days) . ')</span>';
                                             } else {
                                                 echo ' <span class="wssc-expired">(' . esc_html__('Expired', 'woo-stock-sync') . ')</span>';
                                             }
@@ -112,33 +177,32 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
             </div>
         </div>
 
-        <!-- License Form Card -->
+        <!-- License Management Card -->
         <div class="wssc-section wssc-card">
             <div class="wssc-card-header">
                 <h2>
                     <span class="dashicons dashicons-admin-network"></span>
-                    <?php echo $is_active ? esc_html__('License Management', 'woo-stock-sync') : esc_html__('Activate License', 'woo-stock-sync'); ?>
+                    <?php 
+                    if ($is_active) {
+                        esc_html_e('License Management', 'woo-stock-sync');
+                    } elseif ($is_expired) {
+                        esc_html_e('Renew License', 'woo-stock-sync');
+                    } elseif ($is_invalid || !$has_license) {
+                        esc_html_e('Activate License', 'woo-stock-sync');
+                    } else {
+                        esc_html_e('Reactivate License', 'woo-stock-sync');
+                    }
+                    ?>
                 </h2>
             </div>
             <div class="wssc-card-body">
+            
                 <?php if ($is_active): ?>
-                    <!-- Active License Actions -->
+                    <!-- ===== ACTIVE LICENSE ===== -->
                     <div class="wssc-license-key-display">
-                        <label class="wssc-label"><?php esc_html_e('Current License Key', 'woo-stock-sync'); ?></label>
+                        <label class="wssc-label"><?php esc_html_e('License Key', 'woo-stock-sync'); ?></label>
                         <div class="wssc-license-key-masked">
-                            <span class="wssc-key-value">
-                                <?php 
-                                $key_length = strlen($license_key);
-                                if ($key_length > 8) {
-                                    $masked_key = substr($license_key, 0, 4) . str_repeat('•', $key_length - 8) . substr($license_key, -4);
-                                } elseif ($key_length > 4) {
-                                    $masked_key = substr($license_key, 0, 2) . str_repeat('•', $key_length - 2);
-                                } else {
-                                    $masked_key = str_repeat('•', $key_length);
-                                }
-                                echo esc_html($masked_key);
-                                ?>
-                            </span>
+                            <span class="wssc-key-value"><?php echo esc_html($masked_key); ?></span>
                         </div>
                     </div>
 
@@ -147,13 +211,162 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                             <span class="dashicons dashicons-update"></span>
                             <?php esc_html_e('Verify License', 'woo-stock-sync'); ?>
                         </button>
-                        <button type="button" id="wssc-deactivate-license" class="wssc-btn wssc-btn-danger">
+                        <button type="button" id="wssc-deactivate-license" class="wssc-btn wssc-btn-outline-danger">
                             <span class="dashicons dashicons-dismiss"></span>
-                            <?php esc_html_e('Deactivate License', 'woo-stock-sync'); ?>
+                            <?php esc_html_e('Deactivate', 'woo-stock-sync'); ?>
                         </button>
                     </div>
+                    
+                <?php elseif ($is_expired): ?>
+                    <!-- ===== EXPIRED LICENSE ===== -->
+                    <div class="wssc-license-key-display">
+                        <label class="wssc-label"><?php esc_html_e('License Key', 'woo-stock-sync'); ?></label>
+                        <div class="wssc-license-key-masked">
+                            <span class="wssc-key-value"><?php echo esc_html($masked_key); ?></span>
+                        </div>
+                    </div>
+                    
+                    <div class="wssc-expired-notice">
+                        <p><?php esc_html_e('Renew your license to continue receiving updates and using sync features.', 'woo-stock-sync'); ?></p>
+                    </div>
+
+                    <div class="wssc-license-actions">
+                        <a href="<?php echo esc_url($renewal_url); ?>" target="_blank" class="wssc-btn wssc-btn-primary">
+                            <span class="dashicons dashicons-external"></span>
+                            <?php esc_html_e('Renew License', 'woo-stock-sync'); ?>
+                        </a>
+                        <button type="button" id="wssc-check-license" class="wssc-btn wssc-btn-secondary">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Verify Status', 'woo-stock-sync'); ?>
+                        </button>
+                    </div>
+                    
+                    <div class="wssc-different-license">
+                        <p><a href="#" id="wssc-use-different-license"><?php esc_html_e('Use a different license key', 'woo-stock-sync'); ?></a></p>
+                    </div>
+                    
+                    <!-- Hidden form for different license -->
+                    <form id="wssc-license-form" class="wssc-form" style="display: none;">
+                        <div class="wssc-form-row">
+                            <label for="wssc-license-key" class="wssc-label"><?php esc_html_e('New License Key', 'woo-stock-sync'); ?></label>
+                            <div class="wssc-input-group">
+                                <input type="text" id="wssc-license-key" name="license_key" value="" class="wssc-input wssc-input-lg wssc-input-mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+                                <button type="submit" class="wssc-btn wssc-btn-primary">
+                                    <span class="dashicons dashicons-yes"></span>
+                                    <?php esc_html_e('Activate', 'woo-stock-sync'); ?>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                <?php elseif ($is_inactive): ?>
+                    <!-- ===== INACTIVE LICENSE (suspended/domain not activated) ===== -->
+                    <div class="wssc-license-key-display">
+                        <label class="wssc-label"><?php esc_html_e('License Key', 'woo-stock-sync'); ?></label>
+                        <div class="wssc-license-key-masked">
+                            <span class="wssc-key-value"><?php echo esc_html($masked_key); ?></span>
+                        </div>
+                    </div>
+                    
+                    <div class="wssc-inactive-notice">
+                        <p><?php esc_html_e('If your license has been reactivated on our server, click "Verify License" to restore access.', 'woo-stock-sync'); ?></p>
+                    </div>
+
+                    <div class="wssc-license-actions">
+                        <button type="button" id="wssc-check-license" class="wssc-btn wssc-btn-primary">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Verify License', 'woo-stock-sync'); ?>
+                        </button>
+                        <button type="button" id="wssc-deactivate-license" class="wssc-btn wssc-btn-outline-danger">
+                            <span class="dashicons dashicons-dismiss"></span>
+                            <?php esc_html_e('Remove License', 'woo-stock-sync'); ?>
+                        </button>
+                    </div>
+                    
+                    <div class="wssc-different-license">
+                        <p><a href="#" id="wssc-use-different-license"><?php esc_html_e('Use a different license key', 'woo-stock-sync'); ?></a></p>
+                    </div>
+                    
+                    <!-- Hidden form for different license -->
+                    <form id="wssc-license-form" class="wssc-form" style="display: none;">
+                        <div class="wssc-form-row">
+                            <label for="wssc-license-key" class="wssc-label"><?php esc_html_e('New License Key', 'woo-stock-sync'); ?></label>
+                            <div class="wssc-input-group">
+                                <input type="text" id="wssc-license-key" name="license_key" value="" class="wssc-input wssc-input-lg wssc-input-mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+                                <button type="submit" class="wssc-btn wssc-btn-primary">
+                                    <span class="dashicons dashicons-yes"></span>
+                                    <?php esc_html_e('Activate', 'woo-stock-sync'); ?>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                <?php elseif ($is_invalid): ?>
+                    <!-- ===== INVALID LICENSE ===== -->
+                    <?php if ($has_license): ?>
+                        <div class="wssc-license-key-display wssc-invalid-key">
+                            <label class="wssc-label"><?php esc_html_e('Invalid License Key', 'woo-stock-sync'); ?></label>
+                            <div class="wssc-license-key-masked">
+                                <span class="wssc-key-value"><?php echo esc_html($masked_key); ?></span>
+                            </div>
+                        </div>
+                        
+                        <div class="wssc-invalid-notice">
+                            <p><?php esc_html_e('If this license has been corrected on our server, click "Verify License" to check again.', 'woo-stock-sync'); ?></p>
+                        </div>
+
+                        <div class="wssc-license-actions">
+                            <button type="button" id="wssc-check-license" class="wssc-btn wssc-btn-primary">
+                                <span class="dashicons dashicons-update"></span>
+                                <?php esc_html_e('Verify License', 'woo-stock-sync'); ?>
+                            </button>
+                            <button type="button" id="wssc-deactivate-license" class="wssc-btn wssc-btn-outline-danger">
+                                <span class="dashicons dashicons-dismiss"></span>
+                                <?php esc_html_e('Remove License', 'woo-stock-sync'); ?>
+                            </button>
+                        </div>
+                        
+                        <div class="wssc-different-license">
+                            <p><a href="#" id="wssc-use-different-license"><?php esc_html_e('Use a different license key', 'woo-stock-sync'); ?></a></p>
+                        </div>
+                        
+                        <!-- Hidden form for different license -->
+                        <form id="wssc-license-form" class="wssc-form" style="display: none;">
+                            <div class="wssc-form-row">
+                                <label for="wssc-license-key" class="wssc-label"><?php esc_html_e('New License Key', 'woo-stock-sync'); ?></label>
+                                <div class="wssc-input-group">
+                                    <input type="text" id="wssc-license-key" name="license_key" value="" class="wssc-input wssc-input-lg wssc-input-mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+                                    <button type="submit" class="wssc-btn wssc-btn-primary">
+                                        <span class="dashicons dashicons-yes"></span>
+                                        <?php esc_html_e('Activate', 'woo-stock-sync'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    <?php else: ?>
+                        <!-- No key stored, show activation form -->
+                        <form id="wssc-license-form" class="wssc-form">
+                            <div class="wssc-form-row">
+                                <label for="wssc-license-key" class="wssc-label">
+                                    <?php esc_html_e('Enter Valid License Key', 'woo-stock-sync'); ?>
+                                    <span class="wssc-required">*</span>
+                                </label>
+                                <div class="wssc-input-group">
+                                    <input type="text" id="wssc-license-key" name="license_key" value="" class="wssc-input wssc-input-lg wssc-input-mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+                                    <button type="submit" class="wssc-btn wssc-btn-primary">
+                                        <span class="dashicons dashicons-yes"></span>
+                                        <?php esc_html_e('Activate', 'woo-stock-sync'); ?>
+                                    </button>
+                                </div>
+                                <p class="wssc-help-text">
+                                    <?php esc_html_e('Please enter a valid license key. Check your purchase confirmation email.', 'woo-stock-sync'); ?>
+                                </p>
+                            </div>
+                        </form>
+                    <?php endif; ?>
+                    
                 <?php else: ?>
-                    <!-- License Activation Form -->
+                    <!-- ===== NO LICENSE ===== -->
                     <form id="wssc-license-form" class="wssc-form">
                         <div class="wssc-form-row">
                             <label for="wssc-license-key" class="wssc-label">
@@ -161,13 +374,7 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                                 <span class="wssc-required">*</span>
                             </label>
                             <div class="wssc-input-group">
-                                <input type="text" 
-                                       id="wssc-license-key" 
-                                       name="license_key" 
-                                       value="" 
-                                       class="wssc-input wssc-input-lg wssc-input-mono"
-                                       placeholder="XXXX-XXXX-XXXX-XXXX"
-                                       autocomplete="off">
+                                <input type="text" id="wssc-license-key" name="license_key" value="" class="wssc-input wssc-input-lg wssc-input-mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
                                 <button type="submit" class="wssc-btn wssc-btn-primary">
                                     <span class="dashicons dashicons-yes"></span>
                                     <?php esc_html_e('Activate', 'woo-stock-sync'); ?>
@@ -187,44 +394,31 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                         if ($is_active) {
                             printf(
                                 esc_html__('Need more licenses? %s', 'woo-stock-sync'),
-                                '<a href="https://3ag.app/products/woo-stock-sync-from-csv" target="_blank">' . esc_html__('Purchase one here', 'woo-stock-sync') . '</a>'
+                                '<a href="https://3ag.app/products/woo-stock-sync-from-csv" target="_blank">' . esc_html__('Purchase here', 'woo-stock-sync') . '</a>'
                             );
                         } else {
                             printf(
-                                esc_html__('Don\'t have a license? %s', 'woo-stock-sync'),
-                                '<a href="https://3ag.app/products/woo-stock-sync-from-csv" target="_blank">' . esc_html__('Purchase one here', 'woo-stock-sync') . '</a>'
+                                /* translators: %s: link to purchase page */
+                                esc_html__("Don't have a license? %s", 'woo-stock-sync'),
+                                '<a href="https://3ag.app/products/woo-stock-sync-from-csv" target="_blank">' . esc_html__('Purchase here', 'woo-stock-sync') . '</a>'
                             );
                         }
-                        ?>
-                    </p>
-                    <p>
-                        <span class="dashicons dashicons-admin-users"></span>
-                        <?php 
-                        printf(
-                            esc_html__('Manage your licenses and domain activations: %s', 'woo-stock-sync'),
-                            '<a href="https://3ag.app/dashboard/licenses" target="_blank">' . esc_html__('License Dashboard', 'woo-stock-sync') . '</a>'
-                        ); 
                         ?>
                     </p>
                     <p>
                         <span class="dashicons dashicons-email"></span>
                         <?php 
                         printf(
-                            esc_html__('Need help? Contact support: %s', 'woo-stock-sync'),
-                            '<a href="mailto:info@3ag.app">info@3ag.app</a>'
-                        ); 
+                            esc_html__('Need help? %s', 'woo-stock-sync'),
+                            '<a href="mailto:support@3ag.app">' . esc_html__('Contact support', 'woo-stock-sync') . '</a>'
+                        );
                         ?>
                     </p>
                 </div>
             </div>
         </div>
 
-        <!-- Plugin Updates Card -->
-        <?php 
-        $update_data = get_transient('wssc_update_data');
-        $current_version = WSSC_VERSION;
-        $has_update = $update_data && !empty($update_data['version']) && version_compare($current_version, $update_data['version'], '<');
-        ?>
+        <!-- Updates Info Card -->
         <div class="wssc-section wssc-card">
             <div class="wssc-card-header">
                 <h2>
@@ -233,94 +427,19 @@ $package = isset($license_data['package']) ? $license_data['package'] : '';
                 </h2>
             </div>
             <div class="wssc-card-body">
-                <div class="wssc-update-status">
-                    <div class="wssc-version-info">
-                        <div class="wssc-version-row">
-                            <span class="wssc-version-label"><?php esc_html_e('Installed Version:', 'woo-stock-sync'); ?></span>
-                            <span class="wssc-version-value"><?php echo esc_html($current_version); ?></span>
-                        </div>
-                        <?php if ($update_data && !empty($update_data['version'])): ?>
-                        <div class="wssc-version-row">
-                            <span class="wssc-version-label"><?php esc_html_e('Latest Version:', 'woo-stock-sync'); ?></span>
-                            <span class="wssc-version-value <?php echo $has_update ? 'wssc-version-new' : ''; ?>">
-                                <?php echo esc_html($update_data['version']); ?>
-                                <?php if ($has_update): ?>
-                                    <span class="wssc-update-badge"><?php esc_html_e('Update Available', 'woo-stock-sync'); ?></span>
-                                <?php endif; ?>
-                            </span>
-                        </div>
-                        <?php if (!empty($update_data['checked'])): ?>
-                        <div class="wssc-version-row">
-                            <span class="wssc-version-label"><?php esc_html_e('Last Checked:', 'woo-stock-sync'); ?></span>
-                            <span class="wssc-version-value wssc-muted wssc-local-time" data-timestamp="<?php echo esc_attr($update_data['checked']); ?>">
-                                <?php echo esc_html(human_time_diff($update_data['checked'], time())); ?> <?php esc_html_e('ago', 'woo-stock-sync'); ?>
-                            </span>
-                        </div>
-                        <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="wssc-update-actions">
-                        <button type="button" id="wssc-check-update" class="wssc-btn wssc-btn-secondary">
-                            <span class="dashicons dashicons-update"></span>
-                            <?php esc_html_e('Check for Updates', 'woo-stock-sync'); ?>
-                        </button>
-                        <?php if ($has_update): ?>
-                        <button type="button" id="wssc-install-update" class="wssc-btn wssc-btn-primary" data-version="<?php echo esc_attr($update_data['version']); ?>">
-                            <span class="dashicons dashicons-download"></span>
-                            <?php printf(esc_html__('Update to %s', 'woo-stock-sync'), esc_html($update_data['version'])); ?>
-                        </button>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <p class="wssc-help-text wssc-muted" style="margin-top: 15px;">
-                        <span class="dashicons dashicons-external"></span>
-                        <?php 
-                        printf(
-                            esc_html__('Updates are fetched from %s', 'woo-stock-sync'),
-                            '<a href="https://github.com/3AG-App/woo-stock-sync-from-csv/releases" target="_blank">GitHub Releases</a>'
-                        ); 
-                        ?>
-                    </p>
+                <p class="wssc-update-version">
+                    <strong><?php esc_html_e('Current Version:', 'woo-stock-sync'); ?></strong> 
+                    <?php echo esc_html(WSSC_VERSION); ?>
+                </p>
+                
+                <div class="wssc-update-actions">
+                    <button type="button" id="wssc-check-update" class="wssc-btn wssc-btn-secondary">
+                        <span class="dashicons dashicons-update"></span>
+                        <?php esc_html_e('Check for Updates', 'woo-stock-sync'); ?>
+                    </button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Features Info -->
-        <div class="wssc-section wssc-card wssc-card-info">
-            <div class="wssc-card-header">
-                <h2>
-                    <span class="dashicons dashicons-star-filled"></span>
-                    <?php esc_html_e('Premium Features', 'woo-stock-sync'); ?>
-                </h2>
-            </div>
-            <div class="wssc-card-body">
-                <ul class="wssc-features-list">
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Automatic scheduled stock synchronization', 'woo-stock-sync'); ?>
-                    </li>
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Custom CSV column mapping', 'woo-stock-sync'); ?>
-                    </li>
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Support for 4000+ products', 'woo-stock-sync'); ?>
-                    </li>
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Detailed sync logs and history', 'woo-stock-sync'); ?>
-                    </li>
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Watchdog cron for reliability', 'woo-stock-sync'); ?>
-                    </li>
-                    <li>
-                        <span class="dashicons dashicons-yes"></span>
-                        <?php esc_html_e('Priority email support', 'woo-stock-sync'); ?>
-                    </li>
-                </ul>
+                
+                <div id="wssc-update-result" style="display: none;"></div>
             </div>
         </div>
     </div>

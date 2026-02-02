@@ -40,6 +40,7 @@ function wssc_uninstall_cleanup() {
         'wssc_license_status',
         'wssc_license_data',
         'wssc_license_last_check',
+        'wssc_license_grace_start',
         // Sync tracking
         'wssc_last_sync_time',
         'wssc_last_sync_stats',

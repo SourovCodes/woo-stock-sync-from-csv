@@ -36,23 +36,48 @@ class WSSC_Admin {
             return;
         }
         
-        // Check if license key exists but status is not active
-        $license_key = get_option('wssc_license_key');
-        $license_status = get_option('wssc_license_status');
-        
-        if ($license_key && $license_status !== 'active') {
-            ?>
-            <div class="notice notice-warning">
-                <p>
-                    <strong><?php esc_html_e('Stock Sync License Issue:', 'woo-stock-sync'); ?></strong>
-                    <?php esc_html_e('Your license is inactive. Sync has been disabled.', 'woo-stock-sync'); ?>
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=' . self::MENU_SLUG . '-license')); ?>">
-                        <?php esc_html_e('Verify or update your license', 'woo-stock-sync'); ?>
-                    </a>
-                </p>
-            </div>
-            <?php
+        // Skip on license page itself
+        if (strpos($screen->id, 'license') !== false) {
+            return;
         }
+        
+        $license = WSSC()->license;
+        $status = $license->get_status();
+        
+        if (!$license->get_key() || $status === WSSC_License::STATUS_ACTIVE) {
+            return;
+        }
+        
+        // Determine message based on status
+        $notice_class = 'notice-warning';
+        switch ($status) {
+            case WSSC_License::STATUS_EXPIRED:
+                $message = __('Your license has expired. Renew to continue using sync features.', 'woo-stock-sync');
+                $notice_class = 'notice-warning';
+                break;
+            case WSSC_License::STATUS_INVALID:
+                $message = __('Your license key is invalid. Please enter a valid license.', 'woo-stock-sync');
+                $notice_class = 'notice-error';
+                break;
+            case WSSC_License::STATUS_INACTIVE:
+                $message = __('Your license is inactive. Sync has been disabled.', 'woo-stock-sync');
+                $notice_class = 'notice-warning';
+                break;
+            default:
+                $message = __('License issue detected. Sync is disabled.', 'woo-stock-sync');
+        }
+        
+        ?>
+        <div class="notice <?php echo esc_attr($notice_class); ?>">
+            <p>
+                <strong><?php esc_html_e('Stock Sync:', 'woo-stock-sync'); ?></strong>
+                <?php echo esc_html($message); ?>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=' . self::MENU_SLUG . '-license')); ?>">
+                    <?php esc_html_e('Manage License', 'woo-stock-sync'); ?>
+                </a>
+            </p>
+        </div>
+        <?php
     }
     
     /**
@@ -263,11 +288,7 @@ class WSSC_Admin {
      * Render License Page
      */
     public function render_license_page() {
-        $license_key = get_option('wssc_license_key', '');
-        $license_status = get_option('wssc_license_status', '');
-        $license_data = WSSC()->license->get_data();
-        $last_check = get_option('wssc_license_last_check');
-        
+        // View gets data directly from WSSC()->license
         include WSSC_PLUGIN_DIR . 'includes/views/license.php';
     }
     
