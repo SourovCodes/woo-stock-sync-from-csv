@@ -265,7 +265,16 @@ class WSSC_License {
                     }
                 }
             } else {
-                // License exists but not activated for this domain (or suspended)
+                // License exists but not activated for this domain
+                // Try to auto-activate if we were previously invalid/inactive
+                $current_status = get_option('wssc_license_status');
+                if (in_array($current_status, [self::STATUS_INVALID, self::STATUS_INACTIVE, self::STATUS_EXPIRED], true)) {
+                    // Attempt re-activation
+                    $activate_result = $this->activate($license_key);
+                    if ($activate_result['success']) {
+                        return $activate_result;
+                    }
+                }
                 update_option('wssc_license_status', self::STATUS_INACTIVE);
             }
             
