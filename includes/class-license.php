@@ -120,33 +120,43 @@ class WSSC_License {
     
     /**
      * Deactivate license for this domain
+     * 
+     * Always clears local license data, regardless of API response.
+     * This ensures users can enter a new license even if the old one
+     * was deleted from the server or the API is unreachable.
      */
     public function deactivate($license_key = null) {
         if (!$license_key) {
             $license_key = get_option('wssc_license_key');
         }
         
+        // Always clear local license data first
+        delete_option('wssc_license_key');
+        delete_option('wssc_license_status');
+        delete_option('wssc_license_data');
+        delete_option('wssc_license_last_check');
+        
         if (!$license_key) {
             return [
-                'success' => false,
-                'message' => __('No license key found.', 'woo-stock-sync'),
+                'success' => true,
+                'message' => __('License cleared.', 'woo-stock-sync'),
             ];
         }
         
+        // Attempt to deactivate on server (to free up activation slot)
+        // Result doesn't affect local deactivation - it's already done
         $result = $this->api_request('/licenses/deactivate', [
             'license_key' => $license_key,
             'product_slug' => self::PRODUCT_SLUG,
             'domain' => $this->get_domain(),
         ]);
         
-        if ($result['success']) {
-            delete_option('wssc_license_key');
-            delete_option('wssc_license_status');
-            delete_option('wssc_license_data');
-            delete_option('wssc_license_last_check');
-        }
-        
-        return $result;
+        // Always return success since local data is cleared
+        return [
+            'success' => true,
+            'message' => __('License deactivated.', 'woo-stock-sync'),
+            'api_success' => $result['success'],
+        ];
     }
     
     /**

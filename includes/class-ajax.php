@@ -244,16 +244,9 @@ class WSSC_Ajax {
         update_option('wssc_enabled', false);
         WSSC()->scheduler->unschedule();
         
-        if ($result['success']) {
-            wp_send_json_success([
-                'message' => __('License deactivated successfully.', 'woo-stock-sync'),
-            ]);
-        } else {
-            // Still consider it success if we cleared local data
-            wp_send_json_success([
-                'message' => __('License deactivated locally.', 'woo-stock-sync'),
-            ]);
-        }
+        wp_send_json_success([
+            'message' => __('License deactivated successfully.', 'woo-stock-sync'),
+        ]);
     }
     
     /**
