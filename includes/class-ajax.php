@@ -21,6 +21,7 @@ class WSSC_Ajax {
         add_action('wp_ajax_wssc_preview_csv', [$this, 'preview_csv']);
         add_action('wp_ajax_wssc_save_settings', [$this, 'save_settings']);
         add_action('wp_ajax_wssc_activate_license', [$this, 'activate_license']);
+        add_action('wp_ajax_wssc_activate_domain', [$this, 'activate_domain']);
         add_action('wp_ajax_wssc_deactivate_license', [$this, 'deactivate_license']);
         add_action('wp_ajax_wssc_check_license', [$this, 'check_license']);
         add_action('wp_ajax_wssc_clear_logs', [$this, 'clear_logs']);
@@ -233,6 +234,33 @@ class WSSC_Ajax {
     }
     
     /**
+     * Activate domain for existing license
+     * Used when a license is valid but not activated on this domain
+     */
+    public function activate_domain() {
+        $this->verify_nonce();
+        
+        $license_key = WSSC()->license->get_key();
+        
+        if (empty($license_key)) {
+            wp_send_json_error([
+                'message' => __('No license key found. Please enter a license key.', 'woo-stock-sync'),
+            ]);
+        }
+        
+        $result = WSSC()->license->activate($license_key);
+        
+        if ($result['success']) {
+            wp_send_json_success([
+                'message' => __('Domain activated successfully!', 'woo-stock-sync'),
+                'data' => $result['data'],
+            ]);
+        } else {
+            wp_send_json_error($result);
+        }
+    }
+    
+    /**
      * Deactivate license
      */
     public function deactivate_license() {
@@ -257,17 +285,18 @@ class WSSC_Ajax {
     }
     
     /**
-     * Check license status
+     * Check/validate license status
      */
     public function check_license() {
         $this->verify_nonce();
         
-        $result = WSSC()->license->check();
+        $result = WSSC()->license->validate();
         
-        if ($result['success']) {
+        if ($result['success'] && isset($result['data'])) {
             wp_send_json_success([
-                'activated' => isset($result['data']['activated']) ? $result['data']['activated'] : false,
-                'data' => isset($result['data']['license']) ? $result['data']['license'] : $result['data'],
+                'valid' => !empty($result['data']['valid']),
+                'activated' => !empty($result['data']['activated']),
+                'data' => $result['data'],
             ]);
         } else {
             wp_send_json_error($result);
