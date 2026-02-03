@@ -248,6 +248,7 @@ class WSSC_License {
      * 
      * Verifies the license is still valid and activated.
      * Disables sync if license becomes invalid.
+     * Re-enables sync if license becomes valid again (if it was previously disabled by license check).
      */
     public function daily_check() {
         $license_key = get_option(self::OPTION_LICENSE_KEY);
@@ -266,36 +267,98 @@ class WSSC_License {
             && isset($result['data']['activated']) 
             && $result['data']['activated'] === true;
         
-        if (!$is_valid || !$is_activated) {
+        if ($is_valid && $is_activated) {
+            // License is valid - check if we need to restore sync
+            $this->maybe_restore_sync();
+        } else {
             // License is no longer valid, disable sync
-            update_option('wssc_enabled', false);
-            
-            // Clear scheduled sync
-            wp_clear_scheduled_hook('wssc_sync_event');
-            
-            // Determine the reason
-            $reason = __('License validation failed.', 'woo-stock-sync');
-            if ($result['success'] && isset($result['data'])) {
-                if (!$is_valid) {
-                    $status = isset($result['data']['status']) ? $result['data']['status'] : 'unknown';
-                    $reason = sprintf(
-                        /* translators: %s: license status */
-                        __('License is %s.', 'woo-stock-sync'),
-                        $status
-                    );
-                } elseif (!$is_activated) {
-                    $reason = __('License is not activated on this domain.', 'woo-stock-sync');
-                }
+            $this->disable_sync_due_to_license($result);
+        }
+    }
+    
+    /**
+     * Disable sync due to license issues
+     * Stores the previous state so it can be restored later
+     * 
+     * @param array $result The API validation result
+     */
+    private function disable_sync_due_to_license($result) {
+        $currently_enabled = get_option('wssc_enabled', false);
+        
+        // Only store the flag if sync is currently enabled
+        // This prevents overwriting the flag if sync was already disabled
+        if ($currently_enabled) {
+            update_option('wssc_sync_disabled_by_license', true);
+        }
+        
+        // Disable sync
+        update_option('wssc_enabled', false);
+        
+        // Clear scheduled sync
+        wp_clear_scheduled_hook('wssc_sync_event');
+        
+        // Determine the reason
+        $reason = __('License validation failed.', 'woo-stock-sync');
+        $is_valid = isset($result['data']['valid']) && $result['data']['valid'] === true;
+        
+        if ($result['success'] && isset($result['data'])) {
+            if (!$is_valid) {
+                $status = isset($result['data']['status']) ? $result['data']['status'] : 'unknown';
+                $reason = sprintf(
+                    /* translators: %s: license status */
+                    __('License is %s.', 'woo-stock-sync'),
+                    $status
+                );
+            } else {
+                $reason = __('License is not activated on this domain.', 'woo-stock-sync');
             }
-            
-            // Log the event
-            if (class_exists('WSSC_Logs') && WSSC()->logs) {
-                WSSC()->logs->add([
-                    'type' => 'license',
-                    'status' => 'error',
-                    'message' => $reason . ' ' . __('Sync has been disabled.', 'woo-stock-sync'),
-                ]);
-            }
+        }
+        
+        // Log the event
+        if (class_exists('WSSC_Logs') && WSSC()->logs) {
+            WSSC()->logs->add([
+                'type' => 'license',
+                'status' => 'error',
+                'message' => $reason . ' ' . __('Sync has been disabled.', 'woo-stock-sync'),
+            ]);
+        }
+    }
+    
+    /**
+     * Restore sync if it was previously disabled due to license issues
+     */
+    private function maybe_restore_sync() {
+        $was_disabled_by_license = get_option('wssc_sync_disabled_by_license', false);
+        
+        if (!$was_disabled_by_license) {
+            return;
+        }
+        
+        // Clear the flag
+        delete_option('wssc_sync_disabled_by_license');
+        
+        // Check if CSV URL is configured (required for sync to work)
+        $csv_url = get_option('wssc_csv_url', '');
+        if (empty($csv_url)) {
+            return;
+        }
+        
+        // Re-enable sync
+        update_option('wssc_enabled', true);
+        
+        // Reschedule the sync
+        $interval = get_option('wssc_schedule_interval', 'hourly');
+        if (class_exists('WSSC_Scheduler') && WSSC()->scheduler) {
+            WSSC()->scheduler->schedule($interval);
+        }
+        
+        // Log the restoration
+        if (class_exists('WSSC_Logs') && WSSC()->logs) {
+            WSSC()->logs->add([
+                'type' => 'license',
+                'status' => 'success',
+                'message' => __('License is now valid. Sync has been automatically re-enabled.', 'woo-stock-sync'),
+            ]);
         }
     }
     
